@@ -162,12 +162,12 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 **Files:**
 - Create: `internal/control/worker.go`, `internal/control/state.go`, `internal/control/worker_test.go`
 
-- [ ] Implement startup-safe requests, polling, successful-command tracking, periodic refresh, bounded retry/backoff, and reconnect-safe recovery.
-- [ ] Publish synchronized immutable snapshots with freshness and state/reason transitions; enforce staleness even when serial I/O fails.
-- [ ] Implement bounded cancellation and shutdown safe-speed attempts without retaining a low target after a telemetry/control error.
-- [ ] Add deterministic tests for startup→healthy, speed refresh, recovery after reconnect, and transition timestamps.
-- [ ] Add tests for valid telemetry with failed writes, stalled transactions, stale/partial samples, shrinking sensor sets, disconnected fallback failure, cancellation, and retry caps.
-- [ ] Run `go test -race ./...`; pass before Task 6.
+- [x] Implement startup-safe requests, polling, successful-command tracking, periodic refresh, bounded retry/backoff, and reconnect-safe recovery.
+- [x] Publish synchronized immutable snapshots with freshness and state/reason transitions; enforce staleness even when serial I/O fails.
+- [x] Implement bounded cancellation and shutdown safe-speed attempts without retaining a low target after a telemetry/control error.
+- [x] Add deterministic tests for startup→healthy, speed refresh, recovery after reconnect, and transition timestamps.
+- [x] Add tests for valid telemetry with failed writes, stalled transactions, stale/partial samples, shrinking sensor sets, disconnected fallback failure, cancellation, and retry caps.
+- [x] Run `go test -race ./...`; pass before Task 6.
 
 ### Task 6: Coordinate independent enclosure workers
 
