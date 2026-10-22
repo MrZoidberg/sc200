@@ -1,0 +1,7 @@
+Fixtures are verbatim serial output extracted from the original user messages in codex-session-01a162a8-4902-7b42-bae7-6ef0fcb78457.md (planning session). map-12pack.txt preserves the complete _map output, prompts 22571–22572, firmware 12Pack.Slot0.101. unsupported-temp-rd.txt preserves the initial rejection and its first echoed repetition, before the host echo feedback loop; the remainder of that loop is intentionally excluded. No missing output was reconstructed.
+
+SES decoding was checked against upstream sg3_utils src/sg_ses.c (version 2.90 20260821), calc_fan_speed and enc_status_helper: https://github.com/doug-gilbert/sg3_utils/blob/main/src/sg_ses.c . Temperature offset is 20, byte zero unavailable; fan factors 0/1/2 mean N*10 / N*10+20480 / N*100 RPM; factor 3 is invalid.
+
+Source path: /Users/mykhaylomerkulov/Code/homelab/sc200/codex-session-01a162a8-4902-7b42-bae7-6ef0fcb78457.md. Original map output lines 988–1083; unsupported-command initial output lines 384–388. Task 9 identification/help evidence starts in the original user message at line 775 (devils prompt at line 786), followed by _devils output in that message. The source transcript itself is intentionally not committed.
+
+The captured second PSU row has SES status 03 (noncritical), not 05 (not installed). Tests retain that fact and use an explicitly synthetic status-05 row to exercise a noninstalled PSU. The fixture alone does not justify treating the captured PSU fault as an intentionally absent slot.

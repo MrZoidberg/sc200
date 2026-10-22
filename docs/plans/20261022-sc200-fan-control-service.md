@@ -74,7 +74,7 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 - Parse `_map` by section type and row shape, not by scanning arbitrary hex text. Exclude aggregate rows by position. Preserve element indices, status codes, status flags, and raw values. Ignore well-formed unrelated section types; reject malformed relevant sections and incomplete transactions.
 - SES temperature: third status byte minus 20°C; zero is unavailable, not −20°C. The four sample bytes `32`, `34`, `33`, `29` yield 30, 32, 31, 21°C. Evaluate status and failure/overtemperature flags before using a value. Threshold bytes are separate metadata, not current temperatures.
 - Cooling: decode actual RPM from the SES speed field with its factor semantics; cross-check against upstream decoder. For factor-zero sample rows, `01 01 0C 20` yields 2680 RPM. Surface installed fan faults, unavailable readings, and stopped fans as unhealthy and trigger conservative fallback; distinguish explicitly noninstalled elements from failures.
-- Sample power-supply status includes a noninstalled element. Report relevant hardware faults without interpreting an intentionally empty PSU slot as a transport failure. V1 needs temperature/fan decoding, not complete electrical telemetry.
+- The original sample second power-supply status is SES 03 (noncritical), not SES 05 (not installed); preserve/report that fault rather than assuming an empty slot. Report relevant hardware faults without interpreting an intentionally empty PSU slot as a transport failure. V1 needs temperature/fan decoding, not complete electrical telemetry.
 - A prompt without an explicit firmware error indicates only command transaction completion. It does not prove the requested percentage was applied. Capture real `set_speed` output before making stronger acknowledgement claims. Keep target percentage, last completed command percentage, and measured RPM distinct; a percentage cannot be inferred reliably from RPM alone.
 
 ### Control loop and failure states
@@ -128,11 +128,11 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 **Files:**
 - Create: `internal/protocol/map.go`, `internal/protocol/map_test.go`, `internal/protocol/testdata/map-12pack.txt`, `internal/protocol/testdata/unsupported-temp-rd.txt`
 
-- [ ] Preserve the supplied full `_map` transcript and initial unsupported-command response as fixtures; record firmware provenance without inventing missing output.
-- [ ] Implement section-aware temperature/fan decoding, aggregate exclusion, element status, fault flags, unavailable values, and threshold separation.
-- [ ] Add tests for sample temperatures/RPM, unrelated sections, variable element counts, absent PSU slots, and whitespace/line-ending variations.
-- [ ] Add tests for malformed/truncated rows, missing/duplicate relevant sections, invalid hex, zero temperature, non-OK statuses, speed factor boundaries, and overtemperature/fan-fault flags; add parser fuzz seeds.
-- [ ] Run `go test ./...`; pass before Task 3.
+- [x] Preserve the supplied full `_map` transcript and initial unsupported-command response as fixtures; record firmware provenance without inventing missing output.
+- [x] Implement section-aware temperature/fan decoding, aggregate exclusion, element status, fault flags, unavailable values, and threshold separation.
+- [x] Add tests for sample temperatures/RPM, unrelated sections, variable element counts, absent PSU slots, and whitespace/line-ending variations.
+- [x] Add tests for malformed/truncated rows, missing/duplicate relevant sections, invalid hex, zero temperature, non-OK statuses, speed factor boundaries, and overtemperature/fan-fault flags; add parser fuzz seeds.
+- [x] Run `go test ./...`; pass before Task 3.
 
 ### Task 3: Implement bounded serial transactions and device ownership
 
