@@ -184,3 +184,47 @@ func TestStartupBounded(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+// A queued complete old map must not turn an otherwise empty new transaction
+// into fresh telemetry. A speed prompt only establishes completion, never RPM.
+func TestQueuedMapAndPromptOnlyTelemetry(t *testing.T) {
+	b, err := os.ReadFile("../protocol/testdata/map-12pack.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &scripted{replies: []string{testPrompt}}
+	s := session(t, p)
+	p.queued = append(b, []byte(testPrompt)...)
+	p.replies = []string{testPrompt, testPrompt}
+	m, err := s.ReadMap(context.Background())
+	if err == nil || len(m.Temperatures) != 0 || len(m.Fans) != 0 {
+		t.Fatalf("prompt-only response accepted old telemetry: map=%+v err=%v", m, err)
+	}
+	if err = s.SetSpeed(context.Background(), 30); err != nil {
+		t.Fatalf("prompt-only speed completion: %v", err)
+	}
+	if got := strings.Join(p.writes, ""); got != "\r_map\rset_speed 30\r" {
+		t.Fatal(got)
+	}
+}
+
+func TestLateMapAfterTimeoutRequiresReconnect(t *testing.T) {
+	b, err := os.ReadFile("../protocol/testdata/map-12pack.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &scripted{replies: []string{testPrompt}}
+	s := session(t, p)
+	s.timeout = time.Millisecond
+	if _, err = s.ReadMap(context.Background()); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal(err)
+	}
+	p.queued = append(b, []byte(testPrompt)...)
+	before := len(p.writes)
+	if _, err = s.ReadMap(context.Background()); !errors.Is(err, ErrDesynchronized) {
+		t.Fatalf("late map accepted after timeout: %v", err)
+	}
+	if len(p.writes) != before {
+		t.Fatal("poisoned session issued a new command")
+	}
+}

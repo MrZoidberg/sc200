@@ -250,11 +250,17 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 - Modify as needed: tests in `internal/config/`, `internal/discovery/`, `internal/protocol/`, `internal/serial/`, `internal/control/`, `internal/service/`, `internal/httpapi/`, `internal/app/`, `cmd/sc200/`, and `scripts/`
 - Modify: `docs/plans/20261022-sc200-fan-control-service.md`
 
-- [ ] Verify monitoring, curves, conservative fallback, independent enclosure operation, discovery/config population, consistent default paths, health, metrics, service packaging, installer, CI, and release configuration against this plan.
-- [ ] Add missing unit regression cases for discovered gaps, including success and error behavior; verify no code treats a queued old map or prompt-only response as fresh physical confirmation.
-- [ ] Pass `go test -race -coverprofile=coverage.out -covermode=atomic ./...`, coverage gates, `go vet ./...`, formatting, and golangci-lint.
-- [ ] Pass installer/unit-file checks, both Linux builds, and unpublished GoReleaser snapshot validation; confirm no e2e or physical-hardware dependency entered CI.
-- [ ] Record measured coverage and checks; explicitly retain unverified hardware assumptions and external steps.
+- [x] Verify monitoring, curves, conservative fallback, independent enclosure operation, discovery/config population, consistent default paths, health, metrics, service packaging, installer, CI, and release configuration against this plan.
+- [x] Add missing unit regression cases for discovered gaps, including success and error behavior; verify no code treats a queued old map or prompt-only response as fresh physical confirmation.
+- [x] Pass `go test -race -coverprofile=coverage.out -covermode=atomic ./...`, coverage gates, `go vet ./...`, formatting, and golangci-lint.
+- [x] Pass installer/unit-file checks, both Linux builds, and unpublished GoReleaser snapshot validation; confirm no e2e or physical-hardware dependency entered CI.
+- [x] Record measured coverage and checks; explicitly retain unverified hardware assumptions and external steps.
+
+**Acceptance validation:** Existing deterministic tests cover strict/default configuration, map decoding and firmware rejection, pure curve/hysteresis/recovery decisions, startup/reconnect/fallback and independent enclosure shutdown, read-only discovery and atomic configuration merging, cached health/metrics freshness, CLI lifecycle, and installer rollback. Added explicit serial regressions for flushing a queued complete old map, rejecting prompt-only telemetry, accepting a speed prompt solely as transaction completion, and refusing late maps after a timed-out session until reconnect. No physical-actuation acknowledgement is inferred.
+
+**Measured checks:** Linux race coverage is 92.76% overall (including command wiring at 75.00%), configuration 92.42%, protocol 97.33%, control 98.76%. Host race coverage is 95.24%; both coverage gates passed. Formatting, vet, golangci-lint (zero issues), actionlint, bash syntax, ShellCheck, all 33 isolated Linux installer cases, staged-executable systemd verification, both static Linux cross-builds, GoReleaser config/snapshot, exact six-file archive/checksum checks, and packaged native Linux version execution passed. CI invokes these deterministic/component checks without e2e or physical hardware dependencies.
+
+**Still unverified:** Physical set_speed response/actuation, firmware override persistence and restoration on lost host control, actual device temperatures/RPM/calibration and populated layouts, live systemd mount-namespace serial permissions, real GitHub job execution/publication, and operator installation/activation remain the explicit Post-Completion steps. No host installation, service activation, tag, publication, or push was performed.
 
 ### Task 13: Finalize operator and contributor documentation
 
