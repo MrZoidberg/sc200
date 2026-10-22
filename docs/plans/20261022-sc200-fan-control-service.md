@@ -185,11 +185,11 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 **Files:**
 - Create: `internal/httpapi/server.go`, `internal/httpapi/metrics.go`, `internal/httpapi/server_test.go`, `internal/httpapi/metrics_test.go`
 
-- [ ] Pin Prometheus dependency and implement collector metrics from snapshots with bounded labels and explicit telemetry freshness.
-- [ ] Implement `/healthz`, `/readyz`, `/api/v1/health`, method handling, server timeouts, and graceful shutdown.
-- [ ] Add `httptest` and Prometheus collector tests for healthy multi-enclosure responses, metric units/labels, and build info.
-- [ ] Add tests for startup/fallback/disconnection, stale sample omission/null JSON, partial-enclosure failure, unsupported methods, server errors, and concurrent scrape/state updates with no serial calls.
-- [ ] Run `go test -race ./...`; pass before Task 8.
+- [x] Pin Prometheus dependency and implement collector metrics from snapshots with bounded labels and explicit telemetry freshness.
+- [x] Implement `/healthz`, `/readyz`, `/api/v1/health`, method handling, server timeouts, and graceful shutdown.
+- [x] Add `httptest` and Prometheus collector tests for healthy multi-enclosure responses, metric units/labels, and build info.
+- [x] Add tests for startup/fallback/disconnection, stale sample omission/null JSON, partial-enclosure failure, unsupported methods, server errors, and concurrent scrape/state updates with no serial calls.
+- [x] Run `go test -race ./...`; pass before Task 8.
 
 ### Task 8: Wire the CLI and process lifecycle
 
