@@ -174,11 +174,11 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 **Files:**
 - Create: `internal/service/manager.go`, `internal/service/manager_test.go`
 
-- [ ] Start one worker per enabled enclosure after full configuration validation; aggregate cached state and bound lifecycle cleanup.
-- [ ] Keep per-enclosure serial failures independent and coordinate concurrent shutdown with a shared deadline and lock release after final writes.
-- [ ] Add tests for multiple healthy enclosures, disabled entries, snapshot isolation, and orderly shutdown.
-- [ ] Add tests proving one permanently blocked/disconnected port cannot delay another enclosure's polling or shutdown; test startup conflicts and simultaneous cancellation under race detection.
-- [ ] Run `go test -race ./...`; pass before Task 7.
+- [x] Start one worker per enabled enclosure after full configuration validation; aggregate cached state and bound lifecycle cleanup.
+- [x] Keep per-enclosure serial failures independent and coordinate concurrent shutdown with a shared deadline and lock release after final writes.
+- [x] Add tests for multiple healthy enclosures, disabled entries, snapshot isolation, and orderly shutdown.
+- [x] Add tests proving one permanently blocked/disconnected port cannot delay another enclosure's polling or shutdown; test startup conflicts and simultaneous cancellation under race detection.
+- [x] Run `go test -race ./...`; pass before Task 7.
 
 ### Task 7: Expose Prometheus metrics and JSON health endpoints
 

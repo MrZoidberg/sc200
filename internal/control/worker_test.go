@@ -372,8 +372,8 @@ func TestWorkerParentCancellationAndShutdownBudget(t *testing.T) {
 	c := workerConfig()
 	entered := make(chan struct{})
 	release := make(chan struct{})
-	// Opener observes cancellation. A short cleanup context must not block waiting
-	// for an opener still unwinding, and must not send concurrent commands.
+	// Ownership must remain held while a cancelled opener unwinds; shutdown
+	// must not send concurrent commands or skip eventual cleanup.
 	w := NewWorker(c, func(ctx context.Context, _ config.Enclosure) (serial.Controller, error) {
 		close(entered)
 		<-ctx.Done()
@@ -386,13 +386,38 @@ func TestWorkerParentCancellationAndShutdownBudget(t *testing.T) {
 	cancelParent()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := w.Shutdown(ctx); !errors.Is(err, context.Canceled) {
-		t.Fatalf("shutdown budget %v", err)
+	stopped := make(chan error, 1)
+	go func() { stopped <- w.Shutdown(ctx) }()
+	select {
+	case err := <-stopped:
+		t.Fatalf("shutdown returned before opener released ownership: %v", err)
+	default:
 	}
 	close(release)
+	if err := <-stopped; !errors.Is(err, context.Canceled) {
+		t.Fatalf("shutdown budget %v", err)
+	}
 	select {
 	case <-w.done:
 	case <-time.After(time.Second):
 		t.Fatal("parent cancellation not propagated")
+	}
+}
+
+func TestWorkerExpiredShutdownStillClosesController(t *testing.T) {
+	clock := newClock()
+	f := &fakeController{write: func(ctx context.Context, _, _ int) error { return ctx.Err() }}
+	w := NewWorker(workerConfig(), func(context.Context, config.Enclosure) (serial.Controller, error) { return f, nil }, clock)
+	go w.Run(context.Background())
+	_ = clock.paused(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := w.Shutdown(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("shutdown error: %v", err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.closed {
+		t.Fatal("expired cleanup left device open")
 	}
 }

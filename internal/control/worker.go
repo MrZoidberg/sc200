@@ -212,12 +212,10 @@ func (w *Worker) Shutdown(ctx context.Context) error {
 		cancel := w.cancel
 		w.mu.RUnlock()
 		cancel()
-		select {
-		case <-w.done:
-		case <-ctx.Done():
-			w.stopErr = ctx.Err()
-			return
-		}
+		// Run's I/O receives cancellation above and must finish before its controller
+		// can be closed. An already expired shutdown deadline must not skip device
+		// cleanup and allow the manager to release ownership while a port is open.
+		<-w.done
 		w.transition(Stopping, "shutdown", config.ShutdownSpeed, false)
 		if w.controller != nil {
 			w.stopErr = w.command(ctx, config.ShutdownSpeed, "shutdown")
@@ -225,7 +223,7 @@ func (w *Worker) Shutdown(ctx context.Context) error {
 			w.controller = nil
 		} else {
 			w.update(func(s *Snapshot) { s.Operations.Shutdown++; s.Errors.Shutdown++ })
-			w.stopErr = errors.New("shutdown safe-speed unavailable: disconnected")
+			w.stopErr = errors.Join(ctx.Err(), errors.New("shutdown safe-speed unavailable: disconnected"))
 		}
 	})
 	return w.stopErr
