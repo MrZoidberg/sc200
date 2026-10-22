@@ -108,3 +108,26 @@ func TestLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Keep the operator's copy/paste multi-enclosure example executable as documentation evolves.
+func TestOperationsExample(t *testing.T) {
+	b, err := os.ReadFile("../../docs/operations.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, rest, found := strings.Cut(string(b), "```yaml\n")
+	if !found {
+		t.Fatal("missing documented configuration")
+	}
+	example, _, found := strings.Cut(rest, "```")
+	if !found {
+		t.Fatal("unterminated documented configuration")
+	}
+	c, err := Decode(strings.NewReader(example))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Enclosures) != 2 || !c.Enclosures[0].Enabled || !c.Enclosures[1].Enabled || len(c.Enclosures[0].RequiredSensors) != 4 {
+		t.Fatalf("documented multi-enclosure configuration changed: %+v", c)
+	}
+}

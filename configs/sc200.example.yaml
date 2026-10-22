@@ -1,5 +1,7 @@
 # Shared startup, check-config and discovery destination: /etc/sc200/config.yaml
 # Initial settings require hardware commissioning under real workload.
+# See docs/operations.md and docs/hardware.md in the source repository.
+# Restart the service after any changes; configuration is not hot-reloaded.
 http:
   listen: 127.0.0.1:9700
 shutdown_timeout: 5s
@@ -10,6 +12,7 @@ shutdown_timeout: 5s
 enclosures:
   - id: enclosure-1
     enabled: false
+    # Prefer the discovered /dev/serial/by-id path when available.
     port: /dev/ttyS0
     baud: 38400
     poll_interval: 10s
@@ -25,6 +28,7 @@ enclosures:
     critical_temperature: 45
     hysteresis: 2
     # Omit required_sensors to remember all initially installed sensors.
+    # Discovery writes actual indices; do not assume the sample sensor count.
     curve:
       - {temperature: 25, speed: 20}
       - {temperature: 30, speed: 30}

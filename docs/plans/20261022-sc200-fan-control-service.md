@@ -269,12 +269,14 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 - Create: `docs/hardware.md`, `docs/operations.md`, `docs/development.md`
 - Move on completion: this plan to `docs/plans/completed/20261022-sc200-fan-control-service.md` (reuse an existing archive directory if one appears during implementation)
 
-- [ ] Document supported firmware evidence, full transcript capture procedure with `-echo`, SES interpretation, unknown command behavior, acknowledgement limits, and shutdown/communication-loss limits.
-- [ ] Document `sudo sc200 discover --write`, preview/restricted-port discovery, default and explicit config paths, safe merge behavior, and restarting after config additions; include multi-enclosure configuration, stable device paths, curve calibration, permissions, metrics/JSON contracts, alerts, and troubleshooting using real emitted names and fields.
-- [ ] Document gist-ready installation, upgrades/rollback, version pinning, explicit first startup, disabling the old cron job, uninstall with a safe-speed procedure, and configuration restart requirements.
-- [ ] Document local testing/coverage, tool versions, release tagging, and the distinction between unit-verified behavior and manual hardware commissioning.
-- [ ] Validate documented config and CLI examples with existing tests; add/update example tests if documentation introduces different supported cases, and rerun relevant checks.
-- [ ] Mark completed work and archive this plan only when implementation acceptance checks pass.
+- [x] Document supported firmware evidence, full transcript capture procedure with `-echo`, SES interpretation, unknown command behavior, acknowledgement limits, and shutdown/communication-loss limits.
+- [x] Document `sudo sc200 discover --write`, preview/restricted-port discovery, default and explicit config paths, safe merge behavior, and restarting after config additions; include multi-enclosure configuration, stable device paths, curve calibration, permissions, metrics/JSON contracts, alerts, and troubleshooting using real emitted names and fields.
+- [x] Document gist-ready installation, upgrades/rollback, version pinning, explicit first startup, disabling the old cron job, uninstall with a safe-speed procedure, and configuration restart requirements.
+- [x] Document local testing/coverage, tool versions, release tagging, and the distinction between unit-verified behavior and manual hardware commissioning.
+- [x] Validate documented config and CLI examples with existing tests; add/update example tests if documentation introduces different supported cases, and rerun relevant checks.
+- [x] Mark completed work and archive this plan only when implementation acceptance checks pass.
+
+**Documentation validation:** Operator multi-enclosure YAML is decoded by a regression test and successfully passes the real CLI check-config path without hardware. CLI/help/version and installer help were exercised; race tests, gofmt, vet, lint and unpublished snapshot/archive checks passed. Capture script syntax was parsed without executing hardware commands. Physical capture, commissioning, installation/activation, cron changes, gist/release publication and live systemd checks remain external. The archive checkbox records readiness only: the execution harness moves the plan after review/finalization, so it remains here during reviews.
 
 ## Post-Completion
 
