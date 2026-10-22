@@ -139,12 +139,12 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 **Files:**
 - Create: `internal/serial/port_linux.go`, `internal/serial/lock_linux.go`, `internal/serial/session.go`, `internal/serial/session_test.go`, `internal/serial/lock_linux_test.go`
 
-- [ ] Select/pin the serial dependency; implement raw/no-echo 8N1 configuration, per-device exclusivity, compatibility lock handling, and alias detection.
-- [ ] Implement CR commands, bounded prompt synchronization/framing, deadlines, size limits, partial writes, error recognition, resynchronization, and cancellation.
-- [ ] Expose only sensor reads and validated speed writes through a small interface; preserve distinction between transaction completion and physical actuation.
-- [ ] Add tests with scripted ports for chunked prompts/echoes, successful maps, serialization, lock acquisition/release, and correct raw-mode flags through an injected configurator.
-- [ ] Add tests for busy/aliased devices, unsupported commands, I/O errors, stale queued responses, deadline/size limits, partial writes, and cancellation during reads; no physical port required.
-- [ ] Run `go test ./...`; pass before Task 4.
+- [x] Select/pin the serial dependency; implement raw/no-echo 8N1 configuration, per-device exclusivity, compatibility lock handling, and alias detection.
+- [x] Implement CR commands, bounded prompt synchronization/framing, deadlines, size limits, partial writes, error recognition, resynchronization, and cancellation.
+- [x] Expose only sensor reads and validated speed writes through a small interface; preserve distinction between transaction completion and physical actuation.
+- [x] Add tests with scripted ports for chunked prompts/echoes, successful maps, serialization, lock acquisition/release, and correct raw-mode flags through an injected configurator.
+- [x] Add tests for busy/aliased devices, unsupported commands, I/O errors, stale queued responses, deadline/size limits, partial writes, and cancellation during reads; no physical port required.
+- [x] Run `go test ./...`; pass before Task 4.
 
 ### Task 4: Implement the pure thermal fan policy
 
