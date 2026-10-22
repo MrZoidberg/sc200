@@ -1,0 +1,31 @@
+# Shared startup, check-config and discovery destination: /etc/sc200/config.yaml
+# Initial settings require hardware commissioning under real workload.
+http:
+  listen: 127.0.0.1:9700
+shutdown_timeout: 5s
+# Disabled until configured. Run sudo sc200 discover --write to add devices.
+# Validation intentionally rejects a configuration without an enabled device.
+enclosures:
+  - id: enclosure-1
+    enabled: false
+    port: /dev/ttyS0
+    baud: 38400
+    poll_interval: 10s
+    command_timeout: 2s
+    stale_after: 30s
+    refresh_interval: 30s
+    cooldown: 30s
+    reconnect_min: 1s
+    reconnect_max: 30s
+    recovery_samples: 3
+    min_speed: 20
+    safe_speed: 100
+    critical_temperature: 45
+    hysteresis: 2
+    # Omit required_sensors to remember all initially installed sensors.
+    curve:
+      - {temperature: 25, speed: 20}
+      - {temperature: 30, speed: 30}
+      - {temperature: 35, speed: 50}
+      - {temperature: 40, speed: 75}
+      - {temperature: 45, speed: 100}
