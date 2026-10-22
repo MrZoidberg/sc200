@@ -46,18 +46,18 @@ func discover(ctx context.Context, args []string, out, diag io.Writer, o Options
 	}
 	r, err := scan(ctx, ports, *baud)
 	if err != nil {
-		fmt.Fprintln(diag, err)
+		_, _ = fmt.Fprintln(diag, err)
 		return 1
 	}
 	for _, v := range r.Outcomes {
 		if v.Err != nil {
-			fmt.Fprintf(diag, "%s: %v\n", v.Port, v.Err)
+			_, _ = fmt.Fprintf(diag, "%s: %v\n", v.Port, v.Err)
 		} else {
-			fmt.Fprintf(diag, "%s: supported 12Pack console evidence (related firmware/models may share signature)\n", v.Port)
+			_, _ = fmt.Fprintf(diag, "%s: supported 12Pack console evidence (related firmware/models may share signature)\n", v.Port)
 		}
 	}
 	if len(r.Enclosures) == 0 {
-		fmt.Fprintln(diag, "no supported enclosures found; configuration unchanged")
+		_, _ = fmt.Fprintln(diag, "no supported enclosures found; configuration unchanged")
 		return 3
 	}
 	identity := o.DiscoveryIdentity
@@ -66,12 +66,15 @@ func discover(ctx context.Context, args []string, out, diag io.Writer, o Options
 	}
 	data, err := config.MergeFile(*path, r.Enclosures, *write, identity)
 	if err != nil {
-		fmt.Fprintln(diag, err)
+		_, _ = fmt.Fprintln(diag, err)
 		return 1
 	}
-	fmt.Fprint(out, string(data))
+	if _, err := out.Write(data); err != nil {
+		_, _ = fmt.Fprintln(diag, "write discovery output:", err)
+		return 1
+	}
 	if *write {
-		fmt.Fprintf(diag, "Configuration written: %s; restart an already running service to use additions.\n", *path)
+		_, _ = fmt.Fprintf(diag, "Configuration written: %s; restart an already running service to use additions.\n", *path)
 	}
 	return 0
 }

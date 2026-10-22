@@ -172,7 +172,7 @@ func TestOccupiedListener(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	m := &fakeManager{}
 	o := options(m, nil)
 	o.Listen = nil
@@ -256,5 +256,17 @@ func TestTransientDeviceFailureKeepsServing(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("cleanup hung")
+	}
+}
+
+func TestCLIOutputFailure(t *testing.T) {
+	for _, args := range [][]string{{"--version"}, {"--check-config"}} {
+		t.Run(args[0], func(t *testing.T) {
+			var diag bytes.Buffer
+			opts := Options{Load: func(string) (config.Config, error) { return validConfig(), nil }}
+			if code := Run(context.Background(), args, failOutput{}, &diag, opts); code != 1 {
+				t.Fatalf("output error returned %d", code)
+			}
+		})
 	}
 }

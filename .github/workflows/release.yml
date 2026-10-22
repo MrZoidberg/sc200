@@ -1,0 +1,57 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+# Serialize all publications; never interrupt an in-flight release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install pinned Go quality tools
+        run: make tools
+      - name: Install pinned ShellCheck
+        run: |
+          version=$(make -s shellcheck-version)
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --connect-timeout 10 --max-time 120 "https://github.com/koalaman/shellcheck/releases/download/v${version}/shellcheck-v${version}.linux.x86_64.tar.xz" -o /tmp/shellcheck.tar.xz
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          mkdir -p .tools/bin
+          cp "/tmp/shellcheck-v${version}/shellcheck" .tools/bin/shellcheck
+      - name: Deterministic unit, packaging, and release checks (no hardware/e2e)
+        run: make quality
+  publish:
+    needs: quality
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install pinned GoReleaser
+        run: |
+          version=$(make -s goreleaser-version)
+          GOBIN="$PWD/.tools/bin" go install "github.com/goreleaser/goreleaser/v2@v${version}"
+      - name: Publish checked tag
+        run: .tools/bin/goreleaser release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

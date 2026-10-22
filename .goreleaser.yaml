@@ -1,0 +1,35 @@
+version: 2
+project_name: sc200
+builds:
+  - id: sc200
+    main: ./cmd/sc200
+    binary: sc200
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/MrZoidberg/sc200/internal/buildinfo.Version={{ .Version }} -X github.com/MrZoidberg/sc200/internal/buildinfo.Commit={{ .Commit }} -X github.com/MrZoidberg/sc200/internal/buildinfo.Date={{ .Date }}
+archives:
+  - id: linux
+    ids: [sc200]
+    formats: [tar.gz]
+    name_template: 'sc200_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    wrap_in_directory: false
+    files:
+      - src: LICENSE
+      - src: README.md
+      - src: configs/sc200.example.yaml
+        strip_parent: true
+      - src: packaging/systemd/sc200.service
+        strip_parent: true
+      - src: packaging/systemd/sc200.conf
+        strip_parent: true
+checksum:
+  name_template: 'sc200_{{ .Version }}_checksums.txt'
+  algorithm: sha256
+snapshot:
+  version_template: '{{ .Version }}-snapshot'
+changelog:
+  use: git

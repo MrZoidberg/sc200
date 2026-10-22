@@ -128,7 +128,7 @@ func TestServeAndShutdown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer occupied.Close()
+	defer func() { _ = occupied.Close() }()
 	if err := New(occupied.Addr().String(), &source{}, BuildInfo{}).ListenAndServe(); err == nil || errors.Is(err, http.ErrServerClosed) {
 		t.Fatal(err)
 	}

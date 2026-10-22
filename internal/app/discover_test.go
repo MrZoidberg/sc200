@@ -77,7 +77,9 @@ func TestDiscoverCLIErrorsAndHelp(t *testing.T) {
 		}
 	}
 	path := filepath.Join(t.TempDir(), "bad")
-	os.WriteFile(path, []byte("bad: config"), 0600)
+	if err := os.WriteFile(path, []byte("bad: config"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	e := config.DefaultEnclosure()
 	e.ID = "new"
 	e.Port = "/dev/a"
@@ -88,3 +90,19 @@ func TestDiscoverCLIErrorsAndHelp(t *testing.T) {
 		t.Fatal(code)
 	}
 }
+
+func TestDiscoveryOutputFailure(t *testing.T) {
+	e := config.DefaultEnclosure()
+	e.ID, e.Port = "test", "/dev/test"
+	opts := Options{Discover: func(context.Context, []string, int) (discovery.Result, error) {
+		return discovery.Result{Enclosures: []config.Enclosure{e}}, nil
+	}, DiscoveryIdentity: func(p string) (string, error) { return p, nil }}
+	var diag bytes.Buffer
+	if code := Run(context.Background(), []string{"discover", "--config", filepath.Join(t.TempDir(), "config.yaml")}, failOutput{}, &diag, opts); code != 1 || !strings.Contains(diag.String(), "write discovery output") {
+		t.Fatalf("code %d: %s", code, diag.String())
+	}
+}
+
+type failOutput struct{}
+
+func (failOutput) Write([]byte) (int, error) { return 0, errors.New("broken pipe") }

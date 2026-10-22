@@ -27,7 +27,7 @@ func TestLockOwnership(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 	alias := filepath.Join(t.TempDir(), "alias")
 	if e = os.Symlink(path, alias); e != nil {
 		t.Fatal(e)
@@ -82,7 +82,7 @@ func TestLinuxPTY(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer unix.Close(fd)
+	defer func() { _ = unix.Close(fd) }()
 	if e = unix.IoctlSetPointerInt(fd, unix.TIOCSPTLCK, 0); e != nil {
 		t.Fatal(e)
 	}

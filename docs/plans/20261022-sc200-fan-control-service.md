@@ -232,15 +232,17 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 ### Task 11: Automate quality checks and tagged releases
 
 **Files:**
-- Create: `.golangci.yml`, `.goreleaser.yaml`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `Makefile`, `scripts/checkcoverage/main.go`, `scripts/checkcoverage/main_test.go`
-- Modify: `.gitignore`
+- Create: `.golangci.yml`, `.goreleaser.yaml`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `Makefile`, `scripts/checkcoverage/main.go`, `scripts/checkcoverage/main_test.go`, ➕ `scripts/checkrelease.py`
+- Modify: `.gitignore`; ➕ existing CLI/config/discovery cleanup and test setup sites to satisfy the standard lint gate (including CLI output-failure regressions).
 
-- [ ] Define pinned tools and shared Make targets for unit/race tests, coverage gates, vet, formatting, lint, installer checks, and unpublished release validation.
-- [ ] Configure static Linux amd64/arm64 archives, linker metadata, required packaging assets, and checksum names matching installer expectations.
-- [ ] Add PR/push CI and tag releases with checks gating publication, minimal job permissions, and release concurrency protection.
-- [ ] Add coverage-checker unit tests for passing/failing overall and package thresholds, malformed profiles, and missing expected packages.
-- [ ] Validate workflow/config syntax against current official docs; run quality targets, GoReleaser config check, and snapshot build; assert archive contents, binary version, and checksum compatibility offline without publishing.
-- [ ] Pass all checks before Task 12.
+- [x] Define pinned tools and shared Make targets for unit/race tests, coverage gates, vet, formatting, lint, installer checks, and unpublished release validation.
+- [x] Configure static Linux amd64/arm64 archives, linker metadata, required packaging assets, and checksum names matching installer expectations.
+- [x] Add PR/push CI and tag releases with checks gating publication, minimal job permissions, and release concurrency protection.
+- [x] Add coverage-checker unit tests for passing/failing overall and package thresholds, malformed profiles, and missing expected packages.
+- [x] Validate workflow/config syntax against current official docs; run quality targets, GoReleaser config check, and snapshot build; assert archive contents, binary version, and checksum compatibility offline without publishing.
+- [x] Pass all checks before Task 12.
+
+**Validation:** All quality targets passed on macOS or Linux Docker as appropriate. Final Linux race coverage: 92.52% overall, 92.42% configuration, 97.33% protocol, 98.76% control; command wiring is included (75.00%). Standard lint reports zero issues on both hosts. Installer checks passed all 33 isolated cases under GNU tar; systemd verified the unit with its executable path mapped to the staged binary. Both static Linux snapshot archives have exactly six required root files and matching SHA-256 entries; the packaged arm64 binary emitted the expected version/commit/date on Linux. Actual GitHub jobs/publication and hardware commissioning remain external, unrun steps.
 
 ### Task 12: Verify acceptance criteria
 

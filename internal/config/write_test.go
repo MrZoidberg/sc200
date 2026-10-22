@@ -85,7 +85,9 @@ func TestMergePreviewCreatePreserveAndIdempotent(t *testing.T) {
 func TestMergeRejectsInvalidAndDuplicateIdentity(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	bad := []byte("enclosures: [oops]")
-	os.WriteFile(path, bad, 0600)
+	if err := os.WriteFile(path, bad, 0600); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := MergeFile(path, []Enclosure{addition("/dev/a")}, true, pathIdentity); err == nil {
 		t.Fatal("invalid existing accepted")
 	}
@@ -97,7 +99,9 @@ func TestMergeRejectsInvalidAndDuplicateIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(path, data, 0600)
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = MergeFile(path, []Enclosure{addition("/dev/c")}, true, func(string) (string, error) { return "same", nil }); err == nil {
 		t.Fatal("duplicate identities accepted")
 	}
@@ -141,7 +145,7 @@ func TestMergeWriterLockAndErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	if err = unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +173,12 @@ func TestMergeWriterLockAndErrors(t *testing.T) {
 }
 func TestMergeNewFileAppeared(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	_, err := MergeFile(path, []Enclosure{addition("/dev/a")}, true, func(p string) (string, error) { os.WriteFile(path, []byte("external"), 0600); return p, nil })
+	_, err := MergeFile(path, []Enclosure{addition("/dev/a")}, true, func(p string) (string, error) {
+		if err := os.WriteFile(path, []byte("external"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		return p, nil
+	})
 	if err == nil || !strings.Contains(err.Error(), "appeared") {
 		t.Fatal(err)
 	}

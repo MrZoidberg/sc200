@@ -29,7 +29,7 @@ func MergeFile(path string, additions []Enclosure, write bool, identity func(str
 			return fail(err)
 		}
 		lock = os.NewFile(uintptr(fd), path+".lock")
-		defer lock.Close()
+		defer func() { _ = lock.Close() }()
 		if err = unix.Flock(fd, unix.LOCK_EX|unix.LOCK_NB); err != nil {
 			return fail(fmt.Errorf("another config writer is active: %w", err))
 		}
@@ -134,8 +134,8 @@ func MergeFile(path string, additions []Enclosure, write bool, identity func(str
 		return fail(err)
 	}
 	name := tmp.Name()
-	defer os.Remove(name)
-	defer tmp.Close()
+	defer func() { _ = os.Remove(name) }()
+	defer func() { _ = tmp.Close() }()
 	mode := os.FileMode(0640)
 	if exists {
 		st, err := os.Stat(path)

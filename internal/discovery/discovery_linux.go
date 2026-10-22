@@ -27,7 +27,7 @@ func defaults(o *Options) {
 			}
 			s, err := serial.New(ctx, port, 2*time.Second, serial.DefaultResponseLimit)
 			if err != nil {
-				port.Close()
+				_ = port.Close()
 				return nil, err
 			}
 			return s, nil

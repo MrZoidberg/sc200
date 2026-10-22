@@ -101,7 +101,7 @@ func Load(path string) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("read configuration %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	c, err := Decode(f)
 	if err != nil {
 		return Config{}, fmt.Errorf("configuration %s: %w", path, err)

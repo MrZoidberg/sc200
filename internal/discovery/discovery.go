@@ -69,7 +69,7 @@ func Scan(ctx context.Context, ports []string, baud int, o Options) (Result, err
 	if err != nil {
 		return Result{}, fmt.Errorf("discovery cannot acquire daemon ownership: %w", err)
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	sort.Slice(ports, func(i, j int) bool {
 		a, b := strings.HasPrefix(ports[i], "/dev/serial/by-id/"), strings.HasPrefix(ports[j], "/dev/serial/by-id/")
 		if a != b {
@@ -131,7 +131,7 @@ func probe(ctx context.Context, path string, baud int, open func(context.Context
 	if err != nil {
 		return config.Enclosure{}, err
 	}
-	defer p.Close()
+	defer func() { _ = p.Close() }()
 	text, err := p.Identify(ctx)
 	if err != nil {
 		return config.Enclosure{}, err

@@ -53,7 +53,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 	check := flags.Bool("check-config", false, "validate configuration without hardware access")
 	version := flags.Bool("version", false, "print version metadata")
 	flags.Usage = func() {
-		fmt.Fprintf(stderr, "Usage: sc200 [--config PATH] [--check-config | --version]\n       sc200 discover [--config PATH] [--port PATH] [--baud N] [--write]\nDefault configuration: %s\n", config.DefaultPath)
+		_, _ = fmt.Fprintf(stderr, "Usage: sc200 [--config PATH] [--check-config | --version]\n       sc200 discover [--config PATH] [--port PATH] [--baud N] [--write]\nDefault configuration: %s\n", config.DefaultPath)
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -67,7 +67,9 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 		return 2
 	}
 	if *version {
-		fmt.Fprintln(stdout, buildinfo.String())
+		if _, err := fmt.Fprintln(stdout, buildinfo.String()); err != nil {
+			return 1
+		}
 		return 0
 	}
 	log := slog.New(slog.NewJSONHandler(stderr, nil))
@@ -83,7 +85,9 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 		return fail(fmt.Errorf("configuration %s: %w", *path, err))
 	}
 	if *check {
-		fmt.Fprintf(stdout, "Configuration valid: %s\n", *path)
+		if _, err := fmt.Fprintf(stdout, "Configuration valid: %s\n", *path); err != nil {
+			return fail(err)
+		}
 		return 0
 	}
 	if ctx.Err() != nil {
@@ -103,7 +107,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 	if err != nil {
 		return fail(fmt.Errorf("listen %s: %w", cfg.HTTP.Listen, err))
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	// The manager owns normal polling cancellation; cleanup coordinates both owners.
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
