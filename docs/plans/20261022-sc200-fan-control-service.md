@@ -151,11 +151,11 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 **Files:**
 - Create: `internal/control/policy.go`, `internal/control/policy_test.go`
 
-- [ ] Implement maximum-sensor selection, interpolation with upward rounding, speed bounds, critical overrides, and safe-speed decisions.
-- [ ] Define explicit state for hysteresis, delayed reductions, and recovery samples; increases and emergency actions bypass reduction delays.
-- [ ] Add table-driven tests for exact points, interpolation, clamp boundaries, cold/hot ramps, hysteresis, cooldown, and recovery.
-- [ ] Add tests for missing/failed sensors, changing required sensor sets, temperature spikes, emergency transitions, fan faults, and repeated threshold oscillation using injected time.
-- [ ] Run `go test ./...`; pass before Task 5.
+- [x] Implement maximum-sensor selection, interpolation with upward rounding, speed bounds, critical overrides, and safe-speed decisions.
+- [x] Define explicit state for hysteresis, delayed reductions, and recovery samples; increases and emergency actions bypass reduction delays.
+- [x] Add table-driven tests for exact points, interpolation, clamp boundaries, cold/hot ramps, hysteresis, cooldown, and recovery.
+- [x] Add tests for missing/failed sensors, changing required sensor sets, temperature spikes, emergency transitions, fan faults, and repeated threshold oscillation using injected time.
+- [x] Run `go test ./...`; pass before Task 5.
 
 ### Task 5: Run an enclosure control worker with reconnect and fallback
 
