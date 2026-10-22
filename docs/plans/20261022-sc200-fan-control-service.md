@@ -196,12 +196,12 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 **Files:**
 - Create: `cmd/sc200/main.go`, `cmd/sc200/main_test.go`, `internal/app/run.go`, `internal/app/run_test.go`, `internal/buildinfo/version.go`, `internal/buildinfo/version_test.go`
 
-- [ ] Wire configuration, manager, HTTP, structured logging, version metadata, and injected signal context into a testable run function.
-- [ ] Implement check-config/version/help without hardware access; return clear errors and exit statuses.
-- [ ] Route fatal HTTP/startup errors and OS cancellation through bounded cleanup; keep transient device outages nonfatal.
-- [ ] Add tests for CLI flags, version, default/explicit config paths, valid configuration check, and successful process start/stop with fakes.
-- [ ] Add tests for bad flags/config, occupied HTTP listener, permission/lock errors, failed shutdown writes, and ensuring invalid config opens zero devices.
-- [ ] Run `go test -race ./...` and Linux builds; pass before Task 9.
+- [x] Wire configuration, manager, HTTP, structured logging, version metadata, and injected signal context into a testable run function.
+- [x] Implement check-config/version/help without hardware access; return clear errors and exit statuses.
+- [x] Route fatal HTTP/startup errors and OS cancellation through bounded cleanup; keep transient device outages nonfatal.
+- [x] Add tests for CLI flags, version, default/explicit config paths, valid configuration check, and successful process start/stop with fakes.
+- [x] Add tests for bad flags/config, occupied HTTP listener, permission/lock errors, failed shutdown writes, and ensuring invalid config opens zero devices.
+- [x] Run `go test -race ./...` and Linux builds; pass before Task 9.
 
 ### Task 9: ➕ Discover connected enclosures and populate configuration
 
