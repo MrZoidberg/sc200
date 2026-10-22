@@ -127,10 +127,19 @@ func (w *Worker) logFailure(reason string, err error) {
 		w.lastFailure = message
 	}
 }
-func (w *Worker) failure(ctx context.Context, reason string, cause error) {
+
+// resetRecovery discards stability inferred before a transport interruption while
+// retaining sensor identities so reconnect cannot silently drop required sensors.
+func (w *Worker) resetRecovery() {
 	w.policy.Healthy = false
 	w.policy.Recovery = 0
 	w.policy.Target = w.cfg.SafeSpeed
+	w.policy.ReductionPending = false
+	w.policy.ReductionTarget = 0
+	w.policy.ReductionSince = time.Time{}
+}
+func (w *Worker) failure(ctx context.Context, reason string, cause error) {
+	w.resetRecovery()
 	w.transition(Failsafe, reason, w.cfg.SafeSpeed, false)
 	// Exactly one bounded fallback attempt; ambiguous sessions will reject it.
 	fallbackErr := w.command(ctx, w.cfg.SafeSpeed, "fallback")
@@ -165,8 +174,7 @@ func (w *Worker) Run(ctx context.Context) {
 			} else {
 				w.controller = controller
 				w.sessionTelemetry = false
-				w.policy.Healthy = false
-				w.policy.Recovery = 0
+				w.resetRecovery()
 				w.transition(Starting, "recovering", w.cfg.SafeSpeed, false)
 				if err = w.command(ctx, w.cfg.SafeSpeed, "fallback"); err != nil {
 					w.failure(ctx, "control_failed", err)

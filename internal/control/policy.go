@@ -11,7 +11,7 @@ import (
 )
 
 // PolicyState is retained per enclosure, including across transport reconnects.
-// A worker must reset Recovery on reconnect and explicitly supply ControlOK.
+// A worker must reset recovery and pending reductions on reconnect and supply ControlOK.
 // RequiredSensors must never be reset on reconnect: missing sensors remain required.
 type PolicyState struct {
 	RequiredSensors     []int

@@ -487,3 +487,74 @@ func TestWorkerFailureLogsUnderlyingFallbackErrorsOnce(t *testing.T) {
 		t.Fatal(logs)
 	}
 }
+
+func TestWorkerReconnectRestartsReductionCooldown(t *testing.T) {
+	for _, reason := range []string{"telemetry_failed", "stale_telemetry"} {
+		t.Run(reason, func(t *testing.T) {
+			c := workerConfig()
+			c.Cooldown = 30 * time.Second
+			clock := newClock()
+			first := &fakeController{read: func(_ context.Context, n int) (protocol.Map, error) {
+				if n == 4 {
+					if reason == "stale_telemetry" {
+						clock.advance(c.StaleAfter)
+						return goodMap(), nil
+					}
+					return protocol.Map{}, errors.New("disconnected")
+				}
+				return goodMap(), nil
+			}}
+			second := &fakeController{}
+			opens := 0
+			w := startWorker(c, clock, func(context.Context, config.Enclosure) (serial.Controller, error) {
+				opens++
+				if opens == 1 {
+					return first, nil
+				}
+				return second, nil
+			})
+			defer stopWorker(t, w)
+			clock.next(t)
+			clock.next(t)
+			r := clock.paused(t)
+			if !w.policy.ReductionPending {
+				t.Fatal("no pending reduction before outage")
+			}
+			clock.advance(r.duration)
+			r.ch <- clock.Now()
+			r = clock.paused(t)
+			if s := w.Snapshot(); s.State != Disconnected || s.Reason != reason {
+				t.Fatalf("failure: %+v", s)
+			}
+			if w.policy.ReductionPending || w.policy.ReductionTarget != 0 || !w.policy.ReductionSince.IsZero() {
+				t.Fatal("outage retained reduction stability")
+			}
+			clock.advance(2 * c.Cooldown)
+			r.ch <- clock.Now()
+			r = clock.paused(t)
+			for i := 0; i < 2; i++ {
+				clock.advance(r.duration)
+				r.ch <- clock.Now()
+				r = clock.paused(t)
+			}
+			if s := w.Snapshot(); !s.Healthy || s.Target != c.SafeSpeed || s.CompletedCommand != c.SafeSpeed {
+				t.Fatalf("recovery bypassed cooldown: %+v", s)
+			}
+			if len(w.policy.RequiredSensors) != 1 {
+				t.Fatal("required sensors lost")
+			}
+			for i := 0; i < 3; i++ {
+				clock.advance(r.duration)
+				r.ch <- clock.Now()
+				r = clock.paused(t)
+				want := c.SafeSpeed
+				if i == 2 {
+					want = 24
+				}
+				if s := w.Snapshot(); s.Target != want || s.CompletedCommand != want {
+					t.Fatalf("cooldown step %d: %+v", i, s)
+				}
+			}
+		})
+	}
+}
