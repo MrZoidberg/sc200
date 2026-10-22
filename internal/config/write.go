@@ -143,6 +143,13 @@ func MergeFile(path string, additions []Enclosure, write bool, identity func(str
 			return fail(err)
 		}
 		mode = st.Mode().Perm()
+		var owner unix.Stat_t
+		if err = unix.Stat(path, &owner); err != nil {
+			return fail(err)
+		}
+		if err = tmp.Chown(int(owner.Uid), int(owner.Gid)); err != nil {
+			return fail(fmt.Errorf("preserve configuration ownership: %w", err))
+		}
 	}
 	if err = tmp.Chmod(mode); err != nil {
 		return fail(err)

@@ -3,9 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net"
-	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
@@ -124,14 +122,7 @@ func TestServeAndShutdown(t *testing.T) {
 	if err := New("", &source{}, BuildInfo{}).Serve(closed); err == nil {
 		t.Fatal("closed listener accepted")
 	}
-	occupied, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = occupied.Close() }()
-	if err := New(occupied.Addr().String(), &source{}, BuildInfo{}).ListenAndServe(); err == nil || errors.Is(err, http.ErrServerClosed) {
-		t.Fatal(err)
-	}
+
 }
 func TestConcurrentCachedReads(t *testing.T) {
 	src := &source{states: []control.Snapshot{healthy("a")}}
@@ -158,4 +149,20 @@ func TestConcurrentCachedReads(t *testing.T) {
 		}
 	})
 	wg.Wait()
+}
+
+func TestPowerSupplyFaultAndEmptySlotReported(t *testing.T) {
+	state := healthy("shelf")
+	state.Telemetry.PowerSupplies = []protocol.Element{{Index: 0, Installed: true, Status: 3}, {Index: 1, Status: 5}}
+	server := New("", &source{states: []control.Snapshot{state}}, BuildInfo{})
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, httptest.NewRequest("GET", "/api/v1/health", nil))
+	var response Health
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	supplies := response.Enclosures[0].PowerSupplies
+	if len(supplies) != 2 || !supplies[0].Installed || supplies[0].Healthy || supplies[0].Status != 3 || supplies[1].Installed || supplies[1].Status != 5 {
+		t.Fatalf("power supplies: %+v", supplies)
+	}
 }

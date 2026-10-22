@@ -1,8 +1,11 @@
 package control
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -419,5 +422,68 @@ func TestWorkerExpiredShutdownStillClosesController(t *testing.T) {
 	defer f.mu.Unlock()
 	if !f.closed {
 		t.Fatal("expired cleanup left device open")
+	}
+}
+
+func TestWorkerSlowSuccessfulOperationsCannotHideExpiry(t *testing.T) {
+	for _, operation := range []string{"read", "write"} {
+		t.Run(operation, func(t *testing.T) {
+			c := workerConfig()
+			c.PollInterval = 10 * time.Second
+			c.CommandTimeout = 2 * time.Second
+			c.StaleAfter = 13 * time.Second
+			c.RecoverySamples = 1
+			if operation == "write" {
+				c.RefreshInterval = time.Second
+			}
+			clock := newClock()
+			f := &fakeController{}
+			lowWrites := 0
+			f.write = func(_ context.Context, speed, _ int) error {
+				if speed != c.SafeSpeed {
+					lowWrites++
+					if operation == "write" && lowWrites == 2 {
+						clock.advance(14 * time.Second)
+					} else {
+						clock.advance(2 * time.Second)
+					}
+				}
+				return nil
+			}
+			f.read = func(_ context.Context, n int) (protocol.Map, error) {
+				if n == 3 && operation == "read" {
+					clock.advance(4 * time.Second)
+				}
+
+				return goodMap(), nil
+			}
+			w := startWorker(c, clock, func(context.Context, config.Enclosure) (serial.Controller, error) { return f, nil })
+			clock.next(t)
+			clock.next(t)
+			_ = clock.paused(t)
+			s := w.Snapshot()
+			if s.State != Disconnected || s.Reason != "stale_telemetry" || s.CompletedCommand != c.SafeSpeed || w.policy.Recovery != 0 || w.policy.Healthy {
+				t.Fatalf("expired telemetry accepted: %+v", s)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			_ = w.Shutdown(ctx)
+		})
+	}
+}
+
+func TestWorkerFailureLogsUnderlyingFallbackErrorsOnce(t *testing.T) {
+	var output bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&output, nil)))
+	defer slog.SetDefault(previous)
+	w := NewWorker(workerConfig(), nil, newClock())
+	for i := 0; i < 2; i++ {
+		w.controller = &fakeController{write: func(context.Context, int, int) error { return errors.New("fallback serial timeout") }}
+		w.failure(context.Background(), "telemetry_failed", errors.New("device unplugged"))
+	}
+	logs := output.String()
+	if strings.Count(logs, "enclosure operation failed") != 1 || !strings.Contains(logs, "device unplugged") || !strings.Contains(logs, "fallback serial timeout") || !strings.Contains(logs, "enclosure=test") {
+		t.Fatal(logs)
 	}
 }

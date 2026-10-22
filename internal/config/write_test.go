@@ -183,3 +183,42 @@ func TestMergeNewFileAppeared(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestMergePreservesOwnership(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if _, err := MergeFile(path, []Enclosure{addition("/dev/a")}, true, pathIdentity); err != nil {
+		t.Fatal(err)
+	}
+	// Root in the Linux acceptance container can exercise a group differing from
+	// the parent directory; unprivileged runs use another supplementary group.
+	groups, err := os.Getgroups()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if os.Geteuid() == 0 {
+		groups = append(groups, os.Getgid()+1)
+	}
+	group := -1
+	for _, g := range groups {
+		if g != os.Getgid() {
+			group = g
+			break
+		}
+	}
+	if group < 0 {
+		t.Skip("no alternate group available")
+	}
+	if err := os.Chown(path, os.Getuid(), group); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := MergeFile(path, []Enclosure{addition("/dev/b")}, true, pathIdentity); err != nil {
+		t.Fatal(err)
+	}
+	var st unix.Stat_t
+	if err := unix.Stat(path, &st); err != nil {
+		t.Fatal(err)
+	}
+	if int(st.Uid) != os.Getuid() || int(st.Gid) != group || st.Mode&0777 != 0640 {
+		t.Fatalf("ownership/mode: %+v", st)
+	}
+}

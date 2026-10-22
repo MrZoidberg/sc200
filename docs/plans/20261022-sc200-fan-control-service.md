@@ -278,6 +278,8 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 
 **Documentation validation:** Operator multi-enclosure YAML is decoded by a regression test and successfully passes the real CLI check-config path without hardware. CLI/help/version and installer help were exercised; race tests, gofmt, vet, lint and unpublished snapshot/archive checks passed. Capture script syntax was parsed without executing hardware commands. Physical capture, commissioning, installation/activation, cron changes, gist/release publication and live systemd checks remain external. The archive checkbox records readiness only: the execution harness moves the plan after review/finalization, so it remains here during reviews.
 
+**Comprehensive review repairs:** Worker scheduling and normal I/O now share the absolute telemetry freshness budget; expiry commands fallback and resets recovery before accepting another session sample. Atomic discovery replacement preserves existing UID/GID as well as mode and aborts if ownership cannot be preserved. Cached health JSON adds `power_supplies` slot identity/installation/SES status/health so SES 03 faults and SES 05 empty slots remain visible. Runtime device/fallback errors log enclosure identity and underlying errors with repeated identical failures suppressed. Removed the unused HTTP listener-owning wrapper; app listener-boundary tests remain authoritative. Duplicate-archive tests now use a complete valid payload plus one duplicate and assert installation preservation. Added deterministic slow successful read/write, alternate ownership, PSU, and failure logging regressions.
+
 ## Post-Completion
 
 **Manual hardware commissioning:**

@@ -150,8 +150,12 @@ ln -s /etc/passwd "$suite/payload/evil"
 tar -czf "$TEST_ROOT/unsafe.tar.gz" -C "$suite/payload" evil
 export TEST_ARCHIVE="$TEST_ROOT/unsafe.tar.gz"; checksum; run_fail --version v1.2.3
 new_case
-tar -czf "$TEST_ROOT/unsafe.tar.gz" -C "$suite/payload" sc200 sc200
+existing
+ tar -czf "$TEST_ROOT/unsafe.tar.gz" -C "$suite/payload" sc200 sc200.service sc200.conf sc200.example.yaml LICENSE README.md sc200
 export TEST_ARCHIVE="$TEST_ROOT/unsafe.tar.gz"; checksum; run_fail --version v1.2.3
+[[ $(cat "$SC200_INSTALL_ROOT/usr/local/bin/sc200") == 'old binary' ]]
+[[ $(cat "$SC200_INSTALL_ROOT/etc/sc200/config.yaml") == '# preserved configuration' ]]
+[[ ! -e $SC200_INSTALL_ROOT/etc/systemd/system/sc200.service ]]
 new_case
 tar -czf "$TEST_ROOT/unsafe.tar.gz" -C "$suite/payload" LICENSE
 export TEST_ARCHIVE="$TEST_ROOT/unsafe.tar.gz"; checksum; run_fail --version v1.2.3

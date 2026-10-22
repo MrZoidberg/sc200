@@ -3,6 +3,7 @@ package control
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -24,19 +25,21 @@ func (SystemClock) After(d time.Duration) <-chan time.Time { return time.After(d
 // Its controller owns device exclusivity until Close. The manager owns the legacy lock.
 type OpenController func(context.Context, config.Enclosure) (serial.Controller, error)
 type Worker struct {
-	cfg        config.Enclosure
-	open       OpenController
-	clock      Clock
-	mu         sync.RWMutex
-	snapshot   Snapshot
-	cancel     context.CancelFunc
-	runContext context.Context
-	done       chan struct{}
-	controller serial.Controller
-	policy     PolicyState
-	runOnce    sync.Once
-	stopOnce   sync.Once
-	stopErr    error
+	cfg              config.Enclosure
+	open             OpenController
+	clock            Clock
+	mu               sync.RWMutex
+	snapshot         Snapshot
+	cancel           context.CancelFunc
+	runContext       context.Context
+	done             chan struct{}
+	controller       serial.Controller
+	policy           PolicyState
+	runOnce          sync.Once
+	stopOnce         sync.Once
+	stopErr          error
+	lastFailure      string
+	sessionTelemetry bool
 }
 
 func NewWorker(c config.Enclosure, open OpenController, clock Clock) *Worker {
@@ -87,7 +90,11 @@ func (w *Worker) command(ctx context.Context, target int, kind string) error {
 			s.Operations.Shutdown++
 		}
 	})
-	c, cancel := context.WithTimeout(ctx, w.cfg.CommandTimeout)
+	budget := w.cfg.CommandTimeout
+	if kind == "" {
+		budget = min(budget, w.freshnessBudget())
+	}
+	c, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	err := w.controller.SetSpeed(c, target)
 	w.update(func(s *Snapshot) {
@@ -106,13 +113,28 @@ func (w *Worker) command(ctx context.Context, target int, kind string) error {
 	})
 	return err
 }
-func (w *Worker) failure(ctx context.Context, reason string) {
+func (w *Worker) freshnessBudget() time.Duration {
+	s := w.Snapshot()
+	if !w.sessionTelemetry || s.LastTelemetry.IsZero() {
+		return w.cfg.CommandTimeout
+	}
+	return s.LastTelemetry.Add(w.cfg.StaleAfter).Sub(w.clock.Now())
+}
+func (w *Worker) logFailure(reason string, err error) {
+	message := reason + ": " + err.Error()
+	if message != w.lastFailure {
+		slog.Error("enclosure operation failed", "enclosure", w.cfg.ID, "reason", reason, "error", err)
+		w.lastFailure = message
+	}
+}
+func (w *Worker) failure(ctx context.Context, reason string, cause error) {
 	w.policy.Healthy = false
 	w.policy.Recovery = 0
 	w.policy.Target = w.cfg.SafeSpeed
 	w.transition(Failsafe, reason, w.cfg.SafeSpeed, false)
 	// Exactly one bounded fallback attempt; ambiguous sessions will reject it.
-	_ = w.command(ctx, w.cfg.SafeSpeed, "fallback")
+	fallbackErr := w.command(ctx, w.cfg.SafeSpeed, "fallback")
+	w.logFailure(reason, errors.Join(cause, fallbackErr))
 	_ = w.controller.Close()
 	w.controller = nil
 	w.transition(Disconnected, reason, w.cfg.SafeSpeed, false)
@@ -138,29 +160,40 @@ func (w *Worker) Run(ctx context.Context) {
 					_ = controller.Close()
 				}
 				w.update(func(s *Snapshot) { s.Errors.Open++ })
+				w.logFailure("open_failed", err)
 				w.transition(Disconnected, "open_failed", w.cfg.SafeSpeed, false)
 			} else {
 				w.controller = controller
+				w.sessionTelemetry = false
 				w.policy.Healthy = false
 				w.policy.Recovery = 0
 				w.transition(Starting, "recovering", w.cfg.SafeSpeed, false)
 				if err = w.command(ctx, w.cfg.SafeSpeed, "fallback"); err != nil {
-					w.failure(ctx, "control_failed")
+					w.failure(ctx, "control_failed", err)
 				} else {
 					for ctx.Err() == nil {
+						if w.freshnessBudget() <= 0 {
+							w.failure(ctx, "stale_telemetry", errors.New("telemetry freshness deadline expired"))
+							break
+						}
 						w.update(func(s *Snapshot) { s.Operations.Read++ })
-						c, cc = context.WithTimeout(ctx, w.cfg.CommandTimeout)
+						c, cc = context.WithTimeout(ctx, min(w.cfg.CommandTimeout, w.freshnessBudget()))
 						m, readErr := w.controller.ReadMap(c)
 						cc()
 						if ctx.Err() != nil {
 							break
 						}
+						if w.freshnessBudget() <= 0 {
+							w.failure(ctx, "stale_telemetry", errors.Join(readErr, errors.New("telemetry freshness deadline expired")))
+							break
+						}
 						if readErr != nil {
 							w.update(func(s *Snapshot) { s.Errors.Read++ })
-							w.failure(ctx, "telemetry_failed")
+							w.failure(ctx, "telemetry_failed", readErr)
 							break
 						}
 						now := w.clock.Now()
+						w.sessionTelemetry = true
 						w.update(func(s *Snapshot) {
 							s.Telemetry = cloneSnapshot(Snapshot{Telemetry: m}).Telemetry
 							s.LastTelemetry = now
@@ -178,15 +211,23 @@ func (w *Worker) Run(ctx context.Context) {
 						s := w.Snapshot()
 						if s.CompletedCommand != d.Target || now.Sub(s.LastCommand) >= w.cfg.RefreshInterval {
 							if err = w.command(ctx, d.Target, ""); err != nil {
-								w.failure(ctx, "control_failed")
+								w.failure(ctx, "control_failed", err)
 								break
 							}
 						}
-						// Poll by the earliest freshness/refresh deadline, never only by success.
+						if d.Healthy {
+							w.lastFailure = ""
+						}
+						if w.freshnessBudget() <= 0 {
+							w.failure(ctx, "stale_telemetry", errors.New("telemetry freshness deadline expired"))
+							break
+						}
+						// Never sleep beyond the absolute telemetry expiry.
 						delay := min(w.cfg.PollInterval, w.cfg.RefreshInterval-w.clock.Now().Sub(w.Snapshot().LastCommand))
 						if delay <= 0 {
 							delay = w.cfg.PollInterval
 						}
+						delay = min(delay, w.freshnessBudget())
 						if !w.wait(ctx, delay) {
 							break
 						}

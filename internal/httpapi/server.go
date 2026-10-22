@@ -28,7 +28,7 @@ func New(address string, source Source, build BuildInfo) *Server {
 		status := healthStatus(snapshots)
 		response := Health{Healthy: status == http.StatusOK, Enclosures: make([]Enclosure, 0, len(snapshots))}
 		for _, s := range snapshots {
-			e := Enclosure{ID: s.ID, State: s.State, Reason: s.Reason, Healthy: s.Healthy, Fresh: s.Fresh, TransitionTime: s.TransitionTime, Target: s.Target, CompletedCommand: s.CompletedCommand, LastTelemetry: optionalTime(s.LastTelemetry), LastCommand: optionalTime(s.LastCommand), Temperatures: []Reading{}, Fans: []Reading{}}
+			e := Enclosure{ID: s.ID, State: s.State, Reason: s.Reason, Healthy: s.Healthy, Fresh: s.Fresh, TransitionTime: s.TransitionTime, Target: s.Target, CompletedCommand: s.CompletedCommand, LastTelemetry: optionalTime(s.LastTelemetry), LastCommand: optionalTime(s.LastCommand), Temperatures: []Reading{}, Fans: []Reading{}, PowerSupplies: []PowerSupply{}}
 			for _, t := range s.Telemetry.Temperatures {
 				v := s.Fresh && t.Installed && t.Healthy()
 				e.Temperatures = append(e.Temperatures, reading(t.Index, v, t.Celsius))
@@ -36,6 +36,9 @@ func New(address string, source Source, build BuildInfo) *Server {
 			for _, f := range s.Telemetry.Fans {
 				v := s.Fresh && f.Installed && f.Healthy()
 				e.Fans = append(e.Fans, reading(f.Index, v, f.RPM))
+			}
+			for _, psu := range s.Telemetry.PowerSupplies {
+				e.PowerSupplies = append(e.PowerSupplies, PowerSupply{Index: psu.Index, Installed: psu.Installed, Status: psu.Status, Healthy: s.Fresh && psu.Installed && psu.Healthy()})
 			}
 			response.Enclosures = append(response.Enclosures, e)
 		}
@@ -58,13 +61,6 @@ func (s *Server) Handler() http.Handler { return s.server.Handler }
 // Serve returns listener and serving failures to the process lifecycle owner.
 func (s *Server) Serve(listener net.Listener) error {
 	err := s.server.Serve(listener)
-	if errors.Is(err, http.ErrServerClosed) {
-		return nil
-	}
-	return err
-}
-func (s *Server) ListenAndServe() error {
-	err := s.server.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
@@ -106,6 +102,13 @@ type Enclosure struct {
 	LastCommand      *time.Time    `json:"last_command"`
 	Temperatures     []Reading     `json:"temperatures"`
 	Fans             []Reading     `json:"fans"`
+	PowerSupplies    []PowerSupply `json:"power_supplies"`
+}
+type PowerSupply struct {
+	Index     int  `json:"index"`
+	Installed bool `json:"installed"`
+	Status    byte `json:"ses_status"`
+	Healthy   bool `json:"healthy"`
 }
 type Reading struct {
 	Index int  `json:"index"`
