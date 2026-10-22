@@ -1,0 +1,32 @@
+[Unit]
+Description=SC200 temperature-based enclosure fan control
+After=systemd-tmpfiles-setup.service
+Requires=systemd-tmpfiles-setup.service
+
+[Service]
+Type=simple
+User=sc200
+Group=sc200
+SupplementaryGroups=dialout
+ExecStartPre=/usr/local/bin/sc200 --check-config --config /etc/sc200/config.yaml
+ExecStart=/usr/local/bin/sc200 --config /etc/sc200/config.yaml
+RuntimeDirectory=sc200
+RuntimeDirectoryMode=0750
+UMask=0027
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+KillSignal=SIGTERM
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/run/sc200 /run/sc200_fan_control.lock
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

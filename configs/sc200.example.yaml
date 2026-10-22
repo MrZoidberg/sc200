@@ -3,7 +3,9 @@
 http:
   listen: 127.0.0.1:9700
 shutdown_timeout: 5s
-# Disabled until configured. Run sudo sc200 discover --write to add devices.
+# Installed separately as /etc/sc200/config.example.yaml, never as active config.
+# Leave config.yaml absent for first discovery: sudo sc200 discover --write.
+# To configure manually, copy this example and enable/edit at least one device.
 # Validation intentionally rejects a configuration without an enabled device.
 enclosures:
   - id: enclosure-1

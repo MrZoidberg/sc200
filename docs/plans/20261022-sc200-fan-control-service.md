@@ -101,7 +101,7 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 - Go module `github.com/MrZoidberg/sc200`; release binary `sc200`; Linux amd64 and arm64 initially, `CGO_ENABLED=0` if supported by the selected serial implementation. Pin Go/tool versions consistently after checking their official compatibility requirements.
 - GoReleaser archives include binary, LICENSE, example config, systemd unit, and installation documentation, with predictable artifact names and SHA-256 checksum file. Embed version/commit/build date via linker flags. No cross-platform daemon support claimed.
 - `scripts/install.sh` is self-contained when copied to a gist: defaults to the fixed repository, supports latest or an explicit release version, maps supported Linux architectures, downloads assets to `mktemp`, verifies checksums before touching installed files, and cleans up via trap. Use curl with fail/HTTPS/redirect/time limits; do not require Go, git, jq, or repository checkout.
-- Install binary atomically to `/usr/local/bin/sc200`, unit to `/etc/systemd/system/sc200.service`, and config to `/etc/sc200/config.yaml` only if absent. Preserve existing configuration on upgrade, validate it before restart, and restore the previous binary if a requested restart fails. A new install writes an example but does not start hardware control until configured; explain `sudo sc200 discover --write` as the discovery/setup path and avoid an enabled placeholder device in the example. `--start` enables/starts only after successful validation. Existing active installations restart after a successful validated upgrade. State this behavior in help text. The systemd unit and installer use the shared default path; document an explicit unit override for a custom `--config` path.
+- Install binary atomically to `/usr/local/bin/sc200`, unit to `/etc/systemd/system/sc200.service`, and a disabled example to `/etc/sc200/config.example.yaml` only if absent; leave `/etc/sc200/config.yaml` absent until discovery or manual configuration. Preserve existing configuration on upgrade, validate it before restart, and restore the previous binary if a requested restart fails. A new install writes a separate example (➕ avoiding an invalid active config that would block discovery) but does not start hardware control until configured; explain `sudo sc200 discover --write` as the discovery/setup path and avoid an enabled placeholder device in the example. `--start` enables/starts only after successful validation. Existing active installations restart after a successful validated upgrade. State this behavior in help text. The systemd unit and installer use the shared default path; document an explicit unit override for a custom `--config` path.
 - Run as a dedicated `sc200` user with the serial device group (`dialout` by default on Debian/Proxmox; support an explicit group override). Establish `/run/sc200` via systemd RuntimeDirectory and allow the compatibility lock via narrowly scoped setup. Use `Restart=on-failure`, an adequate stop timeout, `NoNewPrivileges`, `ProtectSystem`, and `ProtectHome`; do not enable `PrivateDevices`, which hides serial ports. Test the unit's writable paths against lock creation and serial access.
 - CI on pull requests and main-branch pushes runs format, vet, race/unit coverage gates, lint, installer checks, Linux cross-builds, GoReleaser config validation, and an unpublished snapshot build. A `v*` tag workflow repeats required checks for that commit before publishing through GoReleaser. Pin actions/tools, use read-only permissions except the release job's `contents: write`, and serialize release jobs. No release publication during implementation verification.
 
@@ -219,15 +219,15 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 ### Task 10: Package systemd operation and the standalone installer
 
 **Files:**
-- Create: `packaging/systemd/sc200.service`, `scripts/install.sh`, `scripts/install_test.sh`
+- Create: `packaging/systemd/sc200.service`, `packaging/systemd/sc200.conf`, `scripts/install.sh`, `scripts/install_test.sh`
 - Modify: `configs/sc200.example.yaml`
 
-- [ ] Implement the dedicated account/device permissions, runtime lock paths, restart policy, hardening, and bounded shutdown settings without hiding serial devices.
-- [ ] Implement standalone latest/version installation, architecture mapping, checksum verification, safe extraction, atomic replacement, config preservation, validation, and upgrade rollback.
-- [ ] Provide help and explicit first-install/discovery/start behavior with the shared config-path default; support serial-group override and avoid automatic cron edits.
-- [ ] Add stubbed installer component tests for supported architectures, verified downloads, new install, upgrade preserving config, and requested start/restart command order.
-- [ ] Add tests for unsupported OS/architecture, missing tools/root, unsafe versions/archives, failed downloads/checksums, validation/restart failure, rollback, and temporary-file cleanup; run `bash -n`, ShellCheck, and `systemd-analyze verify` on a suitable Linux runner.
-- [ ] Run installer checks and `go test ./...`; pass before Task 11.
+- [x] Implement the dedicated account/device permissions, runtime lock paths, restart policy, hardening, and bounded shutdown settings without hiding serial devices.
+- [x] Implement standalone latest/version installation, architecture mapping, checksum verification, safe extraction, atomic replacement, config preservation, validation, and upgrade rollback.
+- [x] Provide help and explicit first-install/discovery/start behavior with the shared config-path default; support serial-group override and avoid automatic cron edits.
+- [x] Add stubbed installer component tests for supported architectures, verified downloads, new install, upgrade preserving config, and requested start/restart command order.
+- [x] Add tests for unsupported OS/architecture, missing tools/root, unsafe versions/archives, failed downloads/checksums, validation/restart failure, rollback, and temporary-file cleanup; run `bash -n`, ShellCheck, and `systemd-analyze verify` on a suitable Linux runner.
+- [x] Run installer checks and `go test ./...`; pass before Task 11.
 
 ### Task 11: Automate quality checks and tagged releases
 
