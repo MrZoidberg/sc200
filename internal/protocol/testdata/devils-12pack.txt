@@ -1,0 +1,67 @@
+12Pack.Slot0.101.22569 >devils
+asset_tag   Set or Display the Asset Tag: asset_tag {setvalue}
+broadcast   Send Broadcast SES Message: broadcast
+chassisname Display and or Set Chassis Name: chassisname <name string}
+chassistype Display and or Set Chassis Type: chassistype <0 = Blue Devil !0 = Red Devil>
+clear_eel   Clear Event Error Log: clear_eel
+clear_temp  Remove override of Temperature: clear_temp <sensor>
+dbs         Database Read  : dbs  <page>
+devils      Print the Help Screen
+drive_led   Write drive led: <logicaldrive> <data>
+eepromdump  EEprom Dump: eepromdump <port><addr><size in K(1,2,4,8,..512>
+eepromfill  EEprom Fill: eepromfill <port><addr><size in K(1,2,4,8,..512><pattern>
+eepromwrite EEprom Write: eepromwrite <port><addr><size in K(1,2,4,8,..512><offset><length><pattern>
+fanlog      Fan fault count for each power supply fan [8 per unit]
+fpgadisable Put FPGA in Slave Mode: fpgadisable>
+fpgaenable  Put FPGA in Master Mode: fpgaenable>
+fpga_rd     FPGA Access: fpga_rd <Register> <#bytes>
+fpga_wr     FPGA Access: fpga_wr <Register> <data>[<Register> <data> ...]
+fru_display Display FRU Status: fru_display
+fru_clear   Clear Fru: fru_clear [0-SIM0, 1-SIM1, 2-PBP, 3-PS0, 4-PS1 5-SBP]
+fru_download Download Fru: fru_download [0-SIM0, 1-SIM1, 2-PBP, 3-PS0, 4-PS1 5-SBP]
+fru_read    Read Fru: fru_read [0-SIM0, 1-SIM1, 2-PBP, 3-PS0, 4-PS1 5-SBP]]
+get_time    get encl time: get_time
+gpio_rd     Read a GPIO: gpio_rd <number>
+heart_beat  SIM Heartbeat Control: heart_beat [0=off !0=on] <timeout>
+isim_debug  Change or view isim stats: <data> <0 - Disable; 1 - Enable>
+l4_test     L4 integration manufacturing diag: l4_test
+lm75        LM75 Read Access: lm75 <Slave Address>
+lm75_rd     LM75 Read Access: lm75_rd <Slave Address> <Register>
+lm75_wr     LM75 Write Access: lm75_wr <Slave Address> <Register> <1 byte>
+log_ipmi    Log an IPMI Event:log_ipmi<Code><Type><Sensor><EV0><EV1><EV2><EV3>
+max6654     Display MAX6654 Registers: max6654 <i2c port><slave addr>
+noise       Write audible alarm: <data>
+nvramread8  Read NVram 32bit area: nvramread <address> <length>
+nvramread   Read NVram 32bit area: nvramread <32bit address> <length>
+nvramwrite8 Write NVram 32bit area: nvramwrite <address> <data> [<32bit address> <data> ...]
+nvramwrite  Write NVram 32bit area: nvramwrite <32bit address> <data> [<32bit address> <data> ...]
+page_a      Display drive SAS Address: page_a
+ps_status   Get P/S Module Status: ps_status <l(eft)/r(ight)>
+ps_cap      Get P/S Module capability: ps_cap <l(eft)/r(ight)>
+ps_clear    Clear P/S Module Status: ps_clr <l(eft)/r(ight)>
+ps_page     Get P/S Module Status: ps_status <l(eft)/r(ight)>
+ppid        Set or Display PPID: ppid {fruNumber}{setvalue}
+prompt      Prompt on/off
+rd_8        8-bit Read: rd_8   <address> <# of 8 bit words>
+rd_16       16-bit Read: rd_16  <address> <# of 16 bit words>
+rd_32       32-bit Read: rd_32  <address> <# of 32 bit words>
+reset_peer  Reset other SIM using GPIO <1-reset peer>
+reset       Reset ARM using Watch Dog timer
+rev         SIM Firmware and Diagnogstic Revision
+sas_address Display SAS Address from Phys: (option for magic addr <1>)
+sbb_status  Set SBB status: sbb_set <default-print status, 0-set good, 1-set failed>
+scratchpad  Display Location of Memory Test Area: scratchpad
+service_tag Set or Display the Service Tag: service_tag {setvalue}
+ses_page    Display SES Page: ses_page <page><buffer size>
+set_speed   Sets Fan Speeds: set_speed <0-100%> 20 default
+set_temp    set encl temp: set_temp <sensor><temp>( -55 to 125 degrees C)
+set_thres   Set P/S Module Fan Speed Threshold: set_thres <l(eft)/r(ight)><speed code 0..15>
+shelf_led   Write shelf led: <data> <0 - Disable; 1 - Enable>
+twi_dis     TWI device discovery: twi_dis
+twi_rd      TWI device byte read: twi_rd <port ID> <address> <# of bytes - 0xff max>
+twi_stats   Dump twi statistics: twi_stats [clear]
+twi_wr      TWI device byte write: twi_wr <port ID> <address> {0xff bytes max}
+twi_wr_rd   TWI device wr/rd: twi_wr_rd <port ID> <address> <#read bytes> <write data>
+wr_8        8-bit Write: wr_8  <address> <data> [<address> <data> ...]
+wr_16       16-bit Write: wr_16 <address> <data> [<address> <data> ...]
+wr_32       32-bit Write: wr_32 <address> <data> [<address> <data> ...]

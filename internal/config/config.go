@@ -71,9 +71,14 @@ func (e *Enclosure) UnmarshalYAML(n *yaml.Node) error {
 	return nil
 }
 
+// Default returns the shared global defaults used by loading and discovery.
+func Default() Config {
+	return Config{HTTP: HTTP{Listen: "127.0.0.1:9700"}, ShutdownTimeout: 5 * time.Second}
+}
+
 // Decode rejects unknown fields, duplicate keys and multiple YAML documents.
 func Decode(r io.Reader) (Config, error) {
-	c := Config{HTTP: HTTP{Listen: "127.0.0.1:9700"}, ShutdownTimeout: 5 * time.Second}
+	c := Default()
 	d := yaml.NewDecoder(r)
 	d.KnownFields(true)
 	if err := d.Decode(&c); err != nil {

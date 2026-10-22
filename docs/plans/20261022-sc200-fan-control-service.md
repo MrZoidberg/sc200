@@ -209,12 +209,12 @@ No runtime configuration editing API, remote fan-control API, config hot reload,
 - Create: `internal/discovery/discovery_linux.go`, `internal/discovery/discovery_test.go`, `internal/config/write.go`, `internal/config/write_test.go`, `internal/protocol/testdata/devils-12pack.txt`
 - Modify: `internal/app/run.go`, `internal/app/run_test.go`, `internal/config/config.go`, `internal/config/config_test.go`
 
-- [ ] Implement candidate enumeration, stable-path preference, canonical identity deduplication, explicit port/baud overrides, bounded read-only identification/map probing, and per-port outcome reporting.
-- [ ] Add `sc200 discover` YAML preview and `sc200 discover --write` using the shared default config path; generate unique IDs, discovered required sensors, and conservative loader defaults without starting control.
-- [ ] Implement validated atomic create/merge preserving existing values/comments and disconnected/disabled entries, with config-write serialization, concurrent-edit detection, idempotency, and actionable permission errors.
-- [ ] Add unit tests with fake enumeration/serial/filesystem boundaries for multiple discoveries, UART/USB devices, aliases, deterministic IDs, fresh generation, preview without writes, explicit/default paths, and repeated merges preserving user edits.
-- [ ] Add tests for busy/unsupported/ambiguous devices, partial scan failures, timeouts/cancellation, no discoveries, invalid existing config, duplicate identities, concurrent edits, write failures, and ensuring probes issue zero control commands.
-- [ ] Run `go test -race ./...`; pass before Task 10.
+- [x] Implement candidate enumeration, stable-path preference, canonical identity deduplication, explicit port/baud overrides, bounded read-only identification/map probing, and per-port outcome reporting.
+- [x] Add `sc200 discover` YAML preview and `sc200 discover --write` using the shared default config path; generate unique IDs, discovered required sensors, and conservative loader defaults without starting control.
+- [x] Implement validated atomic create/merge preserving existing values/comments and disconnected/disabled entries, with config-write serialization, concurrent-edit detection, idempotency, and actionable permission errors.
+- [x] Add unit tests with fake enumeration/serial/filesystem boundaries for multiple discoveries, UART/USB devices, aliases, deterministic IDs, fresh generation, preview without writes, explicit/default paths, and repeated merges preserving user edits.
+- [x] Add tests for busy/unsupported/ambiguous devices, partial scan failures, timeouts/cancellation, no discoveries, invalid existing config, duplicate identities, concurrent edits, write failures, and ensuring probes issue zero control commands.
+- [x] Run `go test -race ./...`; pass before Task 10.
 
 ### Task 10: Package systemd operation and the standalone installer
 

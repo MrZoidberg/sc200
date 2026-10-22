@@ -15,6 +15,7 @@ import (
 	"github.com/MrZoidberg/sc200/internal/buildinfo"
 	"github.com/MrZoidberg/sc200/internal/config"
 	"github.com/MrZoidberg/sc200/internal/control"
+	"github.com/MrZoidberg/sc200/internal/discovery"
 	"github.com/MrZoidberg/sc200/internal/httpapi"
 	"github.com/MrZoidberg/sc200/internal/service"
 )
@@ -32,22 +33,27 @@ type HTTPServer interface {
 
 // Options injects process boundaries; nil fields use production implementations.
 type Options struct {
-	Load       func(string) (config.Config, error)
-	NewManager func(config.Config) (Manager, error)
-	Listen     func(string, string) (net.Listener, error)
-	NewHTTP    func(string, Manager) HTTPServer
+	Discover          func(context.Context, []string, int) (discovery.Result, error)
+	DiscoveryIdentity func(string) (string, error)
+	Load              func(string) (config.Config, error)
+	NewManager        func(config.Config) (Manager, error)
+	Listen            func(string, string) (net.Listener, error)
+	NewHTTP           func(string, Manager) HTTPServer
 }
 
 // Run returns shell exit codes: 0 success, 1 runtime/configuration error, 2 usage error.
 // ctx is canceled by the caller's signal handler; shutdown uses an independent deadline.
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Options) int {
+	if len(args) > 0 && args[0] == "discover" {
+		return discover(ctx, args[1:], stdout, stderr, opts)
+	}
 	flags := flag.NewFlagSet("sc200", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	path := flags.String("config", config.DefaultPath, "configuration file path")
 	check := flags.Bool("check-config", false, "validate configuration without hardware access")
 	version := flags.Bool("version", false, "print version metadata")
 	flags.Usage = func() {
-		fmt.Fprintf(stderr, "Usage: sc200 [--config PATH] [--check-config | --version]\nDefault configuration: %s\n", config.DefaultPath)
+		fmt.Fprintf(stderr, "Usage: sc200 [--config PATH] [--check-config | --version]\n       sc200 discover [--config PATH] [--port PATH] [--baud N] [--write]\nDefault configuration: %s\n", config.DefaultPath)
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
