@@ -19,6 +19,7 @@ const DefaultPath = "/etc/sc200/config.yaml"
 const ShutdownSpeed = 100
 
 type Config struct {
+	DryRun          bool          `yaml:"dry_run"`
 	HTTP            HTTP          `yaml:"http"`
 	ShutdownTimeout time.Duration `yaml:"shutdown_timeout"`
 	Enclosures      []Enclosure   `yaml:"enclosures"`

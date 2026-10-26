@@ -26,6 +26,7 @@ func discover(ctx context.Context, args []string, out, diag io.Writer, o Options
 	f.SetOutput(diag)
 	path := f.String("config", config.DefaultPath, "configuration path")
 	write := f.Bool("write", false, "atomically append discoveries; restart service to apply")
+	verbose := f.Bool("verbose", false, "show failures for every probed port")
 	baud := f.Int("baud", 38400, "serial baud")
 	var ports portsFlag
 	f.Var(&ports, "port", "probe only this port (repeatable)")
@@ -49,12 +50,19 @@ func discover(ctx context.Context, args []string, out, diag io.Writer, o Options
 		_, _ = fmt.Fprintln(diag, err)
 		return 1
 	}
+	failed := 0
 	for _, v := range r.Outcomes {
 		if v.Err != nil {
-			_, _ = fmt.Fprintf(diag, "%s: %v\n", v.Port, v.Err)
+			failed++
+			if *verbose || len(ports) > 0 {
+				_, _ = fmt.Fprintf(diag, "%s: probe failed: %v\n", v.Port, v.Err)
+			}
 		} else {
 			_, _ = fmt.Fprintf(diag, "%s: supported 12Pack console evidence (related firmware/models may share signature)\n", v.Port)
 		}
+	}
+	if failed > 0 && !*verbose && len(ports) == 0 {
+		_, _ = fmt.Fprintf(diag, "Skipped %d ports that could not be probed or did not match; use --verbose for details.\n", failed)
 	}
 	if len(r.Enclosures) == 0 {
 		_, _ = fmt.Fprintln(diag, "no supported enclosures found; configuration unchanged")
@@ -68,6 +76,9 @@ func discover(ctx context.Context, args []string, out, diag io.Writer, o Options
 	if err != nil {
 		_, _ = fmt.Fprintln(diag, err)
 		return 1
+	}
+	if !*write {
+		_, _ = fmt.Fprintf(diag, "Configuration preview (not saved); use --write to save to %s.\n", *path)
 	}
 	if _, err := out.Write(data); err != nil {
 		_, _ = fmt.Fprintln(diag, "write discovery output:", err)

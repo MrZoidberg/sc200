@@ -256,3 +256,17 @@ func TestDefaultsAndConfigurationOwnership(t *testing.T) {
 		t.Fatal("identity failure ignored")
 	}
 }
+
+func TestDryRunReachesEveryWorker(t *testing.T) {
+	cfg := configuration()
+	cfg.DryRun = true
+	m, err := New(cfg, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range m.Snapshots() {
+		if !s.DryRun {
+			t.Fatalf("worker %s did not inherit dry_run", s.ID)
+		}
+	}
+}

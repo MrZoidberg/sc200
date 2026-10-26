@@ -3,7 +3,9 @@ package control
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +27,7 @@ func (SystemClock) After(d time.Duration) <-chan time.Time { return time.After(d
 // Its controller owns device exclusivity until Close. The manager owns the legacy lock.
 type OpenController func(context.Context, config.Enclosure) (serial.Controller, error)
 type Worker struct {
+	logger           *slog.Logger
 	cfg              config.Enclosure
 	open             OpenController
 	clock            Clock
@@ -42,12 +45,25 @@ type Worker struct {
 	sessionTelemetry bool
 }
 
-func NewWorker(c config.Enclosure, open OpenController, clock Clock) *Worker {
+type WorkerOptions struct {
+	Logger *slog.Logger
+	DryRun bool
+}
+
+func NewWorker(c config.Enclosure, open OpenController, clock Clock, options ...WorkerOptions) *Worker {
+	logger := slog.Default()
+	var opts WorkerOptions
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	if opts.Logger != nil {
+		logger = opts.Logger
+	}
 	if clock == nil {
 		clock = SystemClock{}
 	}
 	runContext, cancel := context.WithCancel(context.Background())
-	return &Worker{cfg: c, open: open, clock: clock, runContext: runContext, cancel: cancel, done: make(chan struct{}), snapshot: Snapshot{ID: c.ID, State: Starting, Reason: "starting", Target: c.SafeSpeed, TransitionTime: clock.Now()}}
+	return &Worker{logger: logger, cfg: c, open: open, clock: clock, runContext: runContext, cancel: cancel, done: make(chan struct{}), snapshot: Snapshot{DryRun: opts.DryRun, ID: c.ID, State: Starting, Reason: "starting", Target: c.SafeSpeed, TransitionTime: clock.Now()}}
 }
 
 // Snapshot never performs I/O. Expired readings remain available with Fresh=false;
@@ -81,6 +97,15 @@ func (w *Worker) wait(ctx context.Context, d time.Duration) bool {
 	}
 }
 func (w *Worker) command(ctx context.Context, target int, kind string) error {
+	before := w.Snapshot()
+	if before.DryRun {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		w.update(func(s *Snapshot) { s.SimulatedCommand = target; s.LastSimulatedCommand = w.clock.Now() })
+		w.logSpeedCommand(before, target, kind, true)
+		return nil
+	}
 	w.update(func(s *Snapshot) {
 		s.Operations.Command++
 		if kind == "fallback" {
@@ -111,7 +136,50 @@ func (w *Worker) command(ctx context.Context, target int, kind string) error {
 			s.LastCommand = w.clock.Now()
 		}
 	})
+	if err == nil && (before.LastCommand.IsZero() || before.CompletedCommand != target) {
+		w.logSpeedCommand(before, target, kind, false)
+	}
 	return err
+}
+func (w *Worker) logSpeedCommand(before Snapshot, target int, kind string, dryRun bool) {
+	previousSpeed, previousTime := before.CompletedCommand, before.LastCommand
+	if dryRun {
+		previousSpeed, previousTime = before.SimulatedCommand, before.LastSimulatedCommand
+	}
+	attrs := []any{"enclosure", w.cfg.ID, "port", w.cfg.Port, "speed_percent", target, "reason", before.Reason}
+	if !previousTime.IsZero() {
+		attrs = append(attrs, "previous_speed_percent", previousSpeed)
+	}
+	if kind != "" {
+		attrs = append(attrs, "command", kind)
+	}
+	readings := []string{}
+	if w.sessionTelemetry && before.Fresh {
+		for _, t := range before.Telemetry.Temperatures {
+			if t.Installed && t.Available {
+				readings = append(readings, fmt.Sprintf("%d:%d", t.Index, t.Celsius))
+			}
+		}
+	}
+	if len(readings) > 0 {
+		attrs = append(attrs, "temperatures_celsius", strings.Join(readings, ","))
+	} else {
+		attrs = append(attrs, "temperatures_celsius", "unavailable")
+	}
+	message := "fan speed changed"
+	if dryRun {
+		message = "dry-run: fan speed command suppressed"
+		attrs = append(attrs, "dry_run", true, "changed", previousTime.IsZero() || previousSpeed != target)
+	}
+	w.logger.Info(message, attrs...)
+}
+
+// effectiveCommand tracks simulated scheduling separately from completed hardware commands.
+func effectiveCommand(s Snapshot) (int, time.Time) {
+	if s.DryRun {
+		return s.SimulatedCommand, s.LastSimulatedCommand
+	}
+	return s.CompletedCommand, s.LastCommand
 }
 func (w *Worker) freshnessBudget() time.Duration {
 	s := w.Snapshot()
@@ -123,7 +191,7 @@ func (w *Worker) freshnessBudget() time.Duration {
 func (w *Worker) logFailure(reason string, err error) {
 	message := reason + ": " + err.Error()
 	if message != w.lastFailure {
-		slog.Error("enclosure operation failed", "enclosure", w.cfg.ID, "reason", reason, "error", err)
+		w.logger.Error("enclosure operation failed", "enclosure", w.cfg.ID, "reason", reason, "error", err)
 		w.lastFailure = message
 	}
 }
@@ -217,7 +285,8 @@ func (w *Worker) Run(ctx context.Context) {
 						}
 						w.transition(state, d.Reason, d.Target, d.Healthy)
 						s := w.Snapshot()
-						if s.CompletedCommand != d.Target || now.Sub(s.LastCommand) >= w.cfg.RefreshInterval {
+						speed, lastCommand := effectiveCommand(s)
+						if speed != d.Target || now.Sub(lastCommand) >= w.cfg.RefreshInterval {
 							if err = w.command(ctx, d.Target, ""); err != nil {
 								w.failure(ctx, "control_failed", err)
 								break
@@ -231,7 +300,8 @@ func (w *Worker) Run(ctx context.Context) {
 							break
 						}
 						// Never sleep beyond the absolute telemetry expiry.
-						delay := min(w.cfg.PollInterval, w.cfg.RefreshInterval-w.clock.Now().Sub(w.Snapshot().LastCommand))
+						_, lastCommand = effectiveCommand(w.Snapshot())
+						delay := min(w.cfg.PollInterval, w.cfg.RefreshInterval-w.clock.Now().Sub(lastCommand))
 						if delay <= 0 {
 							delay = w.cfg.PollInterval
 						}

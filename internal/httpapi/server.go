@@ -28,7 +28,7 @@ func New(address string, source Source, build BuildInfo) *Server {
 		status := healthStatus(snapshots)
 		response := Health{Healthy: status == http.StatusOK, Enclosures: make([]Enclosure, 0, len(snapshots))}
 		for _, s := range snapshots {
-			e := Enclosure{ID: s.ID, State: s.State, Reason: s.Reason, Healthy: s.Healthy, Fresh: s.Fresh, TransitionTime: s.TransitionTime, Target: s.Target, CompletedCommand: s.CompletedCommand, LastTelemetry: optionalTime(s.LastTelemetry), LastCommand: optionalTime(s.LastCommand), Temperatures: []Reading{}, Fans: []Reading{}, PowerSupplies: []PowerSupply{}}
+			e := Enclosure{DryRun: s.DryRun, SimulatedCommand: s.SimulatedCommand, ID: s.ID, State: s.State, Reason: s.Reason, Healthy: s.Healthy, Fresh: s.Fresh, TransitionTime: s.TransitionTime, Target: s.Target, CompletedCommand: s.CompletedCommand, LastTelemetry: optionalTime(s.LastTelemetry), LastCommand: optionalTime(s.LastCommand), Temperatures: []Reading{}, Fans: []Reading{}, PowerSupplies: []PowerSupply{}}
 			for _, t := range s.Telemetry.Temperatures {
 				v := s.Fresh && t.Installed && t.Healthy()
 				e.Temperatures = append(e.Temperatures, reading(t.Index, v, t.Celsius))
@@ -90,6 +90,8 @@ type Health struct {
 	Enclosures []Enclosure `json:"enclosures"`
 }
 type Enclosure struct {
+	DryRun           bool          `json:"dry_run"`
+	SimulatedCommand int           `json:"simulated_command_percent,omitempty"`
 	ID               string        `json:"id"`
 	State            control.State `json:"state"`
 	Reason           string        `json:"reason"`

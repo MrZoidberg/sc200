@@ -106,3 +106,56 @@ func TestDiscoveryOutputFailure(t *testing.T) {
 type failOutput struct{}
 
 func (failOutput) Write([]byte) (int, error) { return 0, errors.New("broken pipe") }
+
+func TestDiscoverProbeDiagnostics(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		args    []string
+		found   bool
+		details bool
+	}{
+		{"automatic", nil, true, false},
+		{"verbose", []string{"--verbose"}, true, true},
+		{"explicit", []string{"--port", "/dev/test"}, true, true},
+		{"no matches", nil, false, false},
+		{"no matches verbose", []string{"--verbose"}, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := config.DefaultEnclosure()
+			e.ID, e.Port = "test", "/dev/test"
+			opts := Options{Discover: func(context.Context, []string, int) (discovery.Result, error) {
+				r := discovery.Result{Outcomes: []discovery.Outcome{{Port: "/dev/unused", Err: errors.New("input/output error")}}}
+				if tc.found {
+					r.Enclosures = []config.Enclosure{e}
+				}
+				return r, nil
+			}, DiscoveryIdentity: func(p string) (string, error) { return p, nil }}
+			var out, diag bytes.Buffer
+			args := append([]string{"discover", "--config", filepath.Join(t.TempDir(), "config.yaml")}, tc.args...)
+			code := Run(context.Background(), args, &out, &diag, opts)
+			want := 3
+			if tc.found {
+				want = 0
+			}
+			if code != want {
+				t.Fatalf("code %d: %s", code, diag.String())
+			}
+			if strings.Contains(diag.String(), "input/output error") != tc.details {
+				t.Fatal(diag.String())
+			}
+			if !tc.details && !strings.Contains(diag.String(), "Skipped 1 ports") {
+				t.Fatal(diag.String())
+			}
+			if tc.found {
+				if !strings.Contains(diag.String(), "preview (not saved)") {
+					t.Fatal(diag.String())
+				}
+				if _, err := config.Decode(bytes.NewReader(out.Bytes())); err != nil {
+					t.Fatal(err)
+				}
+			} else if out.Len() != 0 {
+				t.Fatal("unexpected config output")
+			}
+		})
+	}
+}

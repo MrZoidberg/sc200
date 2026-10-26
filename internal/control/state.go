@@ -18,19 +18,22 @@ const (
 // Operations and Errors use fixed fields so monitoring cannot grow label cardinality.
 type Counters struct{ Open, Read, Command, Fallback, Shutdown uint64 }
 type Snapshot struct {
-	ID               string
-	State            State
-	Reason           string
-	TransitionTime   time.Time
-	Healthy          bool
-	Fresh            bool
-	Target           int
-	CompletedCommand int
-	LastTelemetry    time.Time
-	LastCommand      time.Time
-	Telemetry        protocol.Map
-	Operations       Counters
-	Errors           Counters
+	DryRun               bool
+	SimulatedCommand     int
+	LastSimulatedCommand time.Time
+	ID                   string
+	State                State
+	Reason               string
+	TransitionTime       time.Time
+	Healthy              bool
+	Fresh                bool
+	Target               int
+	CompletedCommand     int
+	LastTelemetry        time.Time
+	LastCommand          time.Time
+	Telemetry            protocol.Map
+	Operations           Counters
+	Errors               Counters
 }
 
 func cloneSnapshot(s Snapshot) Snapshot {

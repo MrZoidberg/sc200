@@ -2,6 +2,8 @@
 # Initial settings require hardware commissioning under real workload.
 # See docs/operations.md and docs/hardware.md in the source repository.
 # Restart the service after any changes; configuration is not hot-reloaded.
+# Read telemetry and log simulated commands without changing fan speeds.
+dry_run: false
 http:
   listen: 127.0.0.1:9700
 shutdown_timeout: 5s
