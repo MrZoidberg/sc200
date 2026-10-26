@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -554,6 +555,118 @@ func TestWorkerReconnectRestartsReductionCooldown(t *testing.T) {
 				if s := w.Snapshot(); s.Target != want || s.CompletedCommand != want {
 					t.Fatalf("cooldown step %d: %+v", i, s)
 				}
+			}
+		})
+	}
+}
+
+func TestSpeedChangeLogs(t *testing.T) {
+	for _, tc := range []struct {
+		name                   string
+		previous, target       int
+		initial, stale, failed bool
+		kind                   string
+		want                   string
+	}{
+		{name: "change", previous: 50, target: 30, want: "temperatures_celsius=0:25"},
+		{name: "refresh", previous: 30, target: 30},
+		{name: "failed", previous: 50, target: 30, failed: true},
+		{name: "startup", target: 100, initial: true, kind: "fallback", want: "temperatures_celsius=unavailable"},
+		{name: "stale fallback", previous: 30, target: 100, stale: true, kind: "fallback", want: "temperatures_celsius=unavailable"},
+		{name: "shutdown", previous: 30, target: 100, kind: "shutdown", want: "temperatures_celsius=0:25"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			clock := newClock()
+			w := NewWorker(workerConfig(), nil, clock, WorkerOptions{Logger: slog.New(slog.NewTextHandler(&logs, nil))})
+			controller := &fakeController{}
+			if tc.failed {
+				controller.write = func(context.Context, int, int) error { return errors.New("failed") }
+			}
+			w.controller = controller
+			w.snapshot.CompletedCommand = tc.previous
+			if !tc.initial {
+				w.sessionTelemetry = true
+				w.snapshot.LastCommand = clock.Now()
+				w.snapshot.LastTelemetry = clock.Now()
+				w.snapshot.Telemetry = goodMap()
+			}
+			if tc.stale {
+				clock.advance(w.cfg.StaleAfter)
+			}
+			err := w.command(context.Background(), tc.target, tc.kind)
+			if (err != nil) != tc.failed {
+				t.Fatal(err)
+			}
+			if tc.want == "" {
+				if logs.Len() != 0 {
+					t.Fatal(logs.String())
+				}
+				return
+			}
+			for _, want := range []string{"level=INFO", `msg="fan speed changed"`, tc.want, "speed_percent="} {
+				if !strings.Contains(logs.String(), want) {
+					t.Fatalf("missing %s: %s", want, logs.String())
+				}
+			}
+			if !tc.initial && !strings.Contains(logs.String(), "previous_speed_percent=") {
+				t.Fatal(logs.String())
+			}
+		})
+	}
+}
+
+func TestDryRunPollingRefreshFallbackShutdown(t *testing.T) {
+	for _, failedRead := range []bool{false, true} {
+		t.Run(fmt.Sprint(failedRead), func(t *testing.T) {
+			var logs bytes.Buffer
+			clock := newClock()
+			c := workerConfig()
+			c.RecoverySamples = 1
+			f := &fakeController{write: func(context.Context, int, int) error {
+				t.Error("dry-run called SetSpeed")
+				return errors.New("unexpected write")
+			}}
+			if failedRead {
+				f.read = func(context.Context, int) (protocol.Map, error) { return protocol.Map{}, errors.New("read failed") }
+			}
+			w := NewWorker(c, func(context.Context, config.Enclosure) (serial.Controller, error) { return f, nil }, clock, WorkerOptions{DryRun: true, Logger: slog.New(slog.NewTextHandler(&logs, nil))})
+			go w.Run(context.Background())
+			r := clock.paused(t)
+			if !failedRead {
+				for i := 0; i < 7; i++ {
+					clock.advance(r.duration)
+					r.ch <- clock.Now()
+					r = clock.paused(t)
+				}
+				s := w.Snapshot()
+				if !s.Healthy || !s.Fresh || s.SimulatedCommand != 24 {
+					t.Fatalf("%+v", s)
+				}
+			} else if w.Snapshot().State != Disconnected {
+				t.Fatal(w.Snapshot())
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			err := w.Shutdown(ctx)
+			if !failedRead && err != nil {
+				t.Fatal(err)
+			}
+			s := w.Snapshot()
+			if len(f.commands()) != 0 || !s.LastCommand.IsZero() || s.CompletedCommand != 0 || s.Operations.Command != 0 {
+				t.Fatalf("hardware commands recorded: %+v", s)
+			}
+			if !strings.Contains(logs.String(), "dry-run: fan speed command suppressed") || !strings.Contains(logs.String(), "dry_run=true") {
+				t.Fatal(logs.String())
+			}
+			if !failedRead {
+				for _, want := range []string{"temperatures_celsius=0:25", "changed=false", "command=shutdown"} {
+					if !strings.Contains(logs.String(), want) {
+						t.Fatalf("missing %s: %s", want, logs.String())
+					}
+				}
+			} else if strings.Count(logs.String(), "command=fallback") != 2 {
+				t.Fatal(logs.String())
 			}
 		})
 	}

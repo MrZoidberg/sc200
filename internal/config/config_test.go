@@ -131,3 +131,18 @@ func TestOperationsExample(t *testing.T) {
 		t.Fatalf("documented multi-enclosure configuration changed: %+v", c)
 	}
 }
+
+func TestDryRun(t *testing.T) {
+	for _, value := range []string{"", "dry_run: false\n", "dry_run: true\n"} {
+		c, err := Decode(strings.NewReader(value + minimal))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.DryRun != strings.Contains(value, "true") {
+			t.Fatalf("%q: %+v", value, c)
+		}
+	}
+	if _, err := Decode(strings.NewReader("dry_run: invalid\n" + minimal)); err == nil {
+		t.Fatal("accepted invalid dry_run")
+	}
+}

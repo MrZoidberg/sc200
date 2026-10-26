@@ -53,7 +53,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 	check := flags.Bool("check-config", false, "validate configuration without hardware access")
 	version := flags.Bool("version", false, "print version metadata")
 	flags.Usage = func() {
-		_, _ = fmt.Fprintf(stderr, "Usage: sc200 [--config PATH] [--check-config | --version]\n       sc200 discover [--config PATH] [--port PATH] [--baud N] [--write]\nDefault configuration: %s\n", config.DefaultPath)
+		_, _ = fmt.Fprintf(stderr, "Usage: sc200 [--config PATH] [--check-config | --version]\n       sc200 discover [--config PATH] [--port PATH] [--baud N] [--verbose] [--write]\nDefault configuration: %s\n", config.DefaultPath)
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -72,7 +72,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 		}
 		return 0
 	}
-	log := slog.New(slog.NewJSONHandler(stderr, nil))
+	log := slog.New(slog.NewTextHandler(stderr, nil))
 	fail := func(err error) int { log.Error("service failed", "error", err); return 1 }
 	if opts.Load == nil {
 		opts.Load = config.Load
@@ -94,7 +94,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 		return 0
 	}
 	if opts.NewManager == nil {
-		opts.NewManager = func(c config.Config) (Manager, error) { return service.New(c, service.Options{}) }
+		opts.NewManager = func(c config.Config) (Manager, error) { return service.New(c, service.Options{Logger: log}) }
 	}
 	manager, err := opts.NewManager(cfg)
 	if err != nil {
@@ -124,7 +124,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 	server := opts.NewHTTP(cfg.HTTP.Listen, manager)
 	served := make(chan error, 1)
 	go func() { served <- server.Serve(listener) }()
-	log.Info("service started", "config", *path, "listen", listener.Addr().String())
+	log.Info("service started", "config", *path, "listen", listener.Addr().String(), "dry_run", cfg.DryRun)
 	select {
 	case <-ctx.Done():
 	case err = <-served:

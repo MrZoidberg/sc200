@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 // Options supplies hardware boundaries. Nil fields use platform defaults.
 // Open must honor cancellation; returned controllers own their device until Close.
 type Options struct {
+	Logger      *slog.Logger
 	Open        control.OpenController
 	AcquireLock func() (io.Closer, error)
 	Identity    func(string) (string, error)
@@ -56,7 +58,7 @@ func New(cfg config.Config, options Options) (*Manager, error) {
 		if c.RequiredSensors != nil {
 			c.RequiredSensors = append([]int{}, c.RequiredSensors...)
 		}
-		m.workers = append(m.workers, control.NewWorker(c, m.open, options.Clock))
+		m.workers = append(m.workers, control.NewWorker(c, m.open, options.Clock, control.WorkerOptions{Logger: options.Logger, DryRun: cfg.DryRun}))
 	}
 	return m, nil
 }
