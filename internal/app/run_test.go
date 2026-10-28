@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -268,5 +269,25 @@ func TestCLIOutputFailure(t *testing.T) {
 				t.Fatalf("output error returned %d", code)
 			}
 		})
+	}
+}
+
+func TestCLIUsesReadableConsoleLogs(t *testing.T) {
+	code, _, output := invoke(context.Background(), nil, Options{Load: func(string) (config.Config, error) {
+		return config.Config{}, errors.New("test configuration unavailable")
+	}})
+	if code != 1 {
+		t.Fatalf("exit code: %d", code)
+	}
+	if !regexp.MustCompile(`^[A-Z][a-z]{2} [0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} ERROR service failed error=`).MatchString(output) {
+		t.Fatalf("unexpected console format: %s", output)
+	}
+	for _, field := range []string{"time=", "level=", "msg="} {
+		if strings.Contains(output, field) {
+			t.Fatalf("default slog prefix returned: %s", output)
+		}
+	}
+	if !strings.Contains(output, "test configuration unavailable") {
+		t.Fatal("error details lost")
 	}
 }

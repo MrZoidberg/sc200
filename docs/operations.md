@@ -87,3 +87,5 @@ Readiness 503 during startup/recovery is expected until valid samples and succes
 
 The health JSON `power_supplies` array retains each slot’s `index`, `installed`, numeric `ses_status`, and freshness-qualified `healthy` flag. An installed SES 03 supply reports a hardware fault; SES 05 identifies an empty slot. These statuses do not imply a transport failure or change the temperature control policy.
 Runtime device and fallback errors include the enclosure identity in structured logs; identical errors are suppressed until recovery or a different failure.
+
+Console logs use a compact local-time prefix, for example `Oct 28 13:56:26 INFO dry-run: fan speed command suppressed`, followed by structured `key=value` fields. Newlines in messages are escaped so each event occupies one line. Journald may add its own timestamp and service prefix.
