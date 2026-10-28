@@ -111,6 +111,9 @@ grep -q "useradd --system" "$TEST_LOG"
 grep -q "groupadd --system" "$TEST_LOG"
 new_case; export TEST_MISSING_GROUP=1; run_fail --version v1.2.3
 new_case; run_ok # latest redirect
+grep -q "sc200 --setup" "$TEST_ROOT/output"
+new_case; run_ok --no-setup --version v1.2.3
+grep -q "sc200 --setup" "$TEST_ROOT/output"
 new_case; existing; export TEST_ACTIVE=1; run_ok --version v1.2.3
 [[ $(cat "$SC200_INSTALL_ROOT/etc/sc200/config.yaml") == '# preserved configuration' ]]
 awk '/validate/ {v=NR} /systemctl restart/ {if (!v || v>=NR) exit 1; found=1} END {if (!found) exit 1}' "$TEST_LOG"
