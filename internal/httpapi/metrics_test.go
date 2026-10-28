@@ -58,3 +58,26 @@ func TestCollectorPedanticUnavailable(t *testing.T) {
 		}
 	}
 }
+
+func TestDryRunMetricsOmitted(t *testing.T) {
+	for _, dryRun := range []bool{false, true} {
+		a := healthy("a")
+		a.DryRun = dryRun
+		a.SimulatedCommand = 42
+		s := New("", &source{states: []control.Snapshot{a}}, BuildInfo{})
+		w := httptest.NewRecorder()
+		s.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/metrics", nil))
+		if w.Code != 200 {
+			t.Fatal(w.Body.String())
+		}
+		body := w.Body.String()
+		for _, removed := range []string{"sc200_dry_run", "sc200_simulated_command_percent"} {
+			if strings.Contains(body, removed) {
+				t.Errorf("dry_run=%v: removed metric %s is still exposed", dryRun, removed)
+			}
+		}
+		if !strings.Contains(body, `sc200_target_percent{enclosure="a"} 40`) {
+			t.Errorf("dry_run=%v: normal telemetry metrics missing", dryRun)
+		}
+	}
+}

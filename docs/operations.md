@@ -4,6 +4,8 @@ Follow the README installation sequence. `sc200 --help`, `sc200 discover --help`
 
 ## Configuration and policy
 
+See the [configuration reference](configuration.md) for every YAML field, its default, validation rules, and runtime behavior.
+
 `/etc/sc200/config.yaml` is the only implicit path, including discovery writes. There is no fallback or reload. The packaged disabled example intentionally fails validation until commissioned. For a compact valid two-enclosure configuration (replace port paths with your devices):
 
 ```yaml
