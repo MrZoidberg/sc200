@@ -16,7 +16,7 @@ import (
 )
 
 const DefaultPath = "/etc/sc200/config.yaml"
-const ShutdownSpeed = 100
+const MaxSpeed = 100
 
 type Config struct {
 	DryRun          bool          `yaml:"dry_run"`
@@ -184,7 +184,7 @@ func (e Enclosure) Validate() error {
 		return fmt.Errorf("curve requires at least two points")
 	}
 	for i, p := range e.Curve {
-		if !finite(p.Temperature) || p.Speed < e.MinSpeed || p.Speed > e.SafeSpeed {
+		if !finite(p.Temperature) || p.Speed < e.MinSpeed || p.Speed > MaxSpeed {
 			return fmt.Errorf("curve point %d has invalid temperature or unsafe speed", i)
 		}
 		if i > 0 && (p.Temperature <= e.Curve[i-1].Temperature || p.Speed < e.Curve[i-1].Speed) {

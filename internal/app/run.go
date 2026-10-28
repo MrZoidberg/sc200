@@ -53,7 +53,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 	check := flags.Bool("check-config", false, "validate configuration without hardware access")
 	version := flags.Bool("version", false, "print version metadata")
 	flags.Usage = func() {
-		_, _ = fmt.Fprintf(stderr, "Usage: sc200 [--config PATH] [--check-config | --version]\n       sc200 discover [--config PATH] [--port PATH] [--baud N] [--verbose] [--write]\nDefault configuration: %s\n", config.DefaultPath)
+		_, _ = fmt.Fprintf(stderr, "Usage: sc200 [--config PATH] [--check-config | --version]\n       sc200 discover [--config PATH] [--port PATH] [--baud N] [--profile safe|quiet] [--verbose] [--write]\nDefault configuration: %s\n", config.DefaultPath)
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {

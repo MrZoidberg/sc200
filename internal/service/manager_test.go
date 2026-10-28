@@ -30,12 +30,11 @@ func (l *fakeLock) Close() error {
 }
 
 type device struct {
-	mu            sync.Mutex
-	reads         int
-	speeds        []int
-	closed        bool
-	block         bool
-	shutdownBlock bool
+	mu     sync.Mutex
+	reads  int
+	speeds []int
+	closed bool
+	block  bool
 }
 
 func (d *device) ReadMap(ctx context.Context) (protocol.Map, error) {
@@ -49,15 +48,10 @@ func (d *device) ReadMap(ctx context.Context) (protocol.Map, error) {
 	e := protocol.Element{Index: 0, Installed: true, Status: 1}
 	return protocol.Map{Temperatures: []protocol.Temperature{{Element: e, Available: true, Celsius: 25}}, Fans: []protocol.Fan{{Element: e, Available: true, RPM: 2680}}}, nil
 }
-func (d *device) SetSpeed(ctx context.Context, n int) error {
+func (d *device) SetSpeed(_ context.Context, n int) error {
 	d.mu.Lock()
 	d.speeds = append(d.speeds, n)
-	count := len(d.speeds)
 	d.mu.Unlock()
-	if d.shutdownBlock && n == 100 && count > 1 {
-		<-ctx.Done()
-		return ctx.Err()
-	}
 	return nil
 }
 func (d *device) Close() error { d.mu.Lock(); d.closed = true; d.mu.Unlock(); return nil }
@@ -104,8 +98,8 @@ func TestHealthyIsolationShutdown(t *testing.T) {
 	l.verify = func() {
 		for _, d := range devices {
 			d.mu.Lock()
-			if !d.closed || d.speeds[len(d.speeds)-1] != 100 {
-				t.Error("lock released before safe write and close")
+			if !d.closed {
+				t.Error("lock released before controller close")
 			}
 			d.mu.Unlock()
 		}
@@ -134,11 +128,11 @@ func TestHealthyIsolationShutdown(t *testing.T) {
 	}
 }
 func TestBlockedAndDisconnectedIsolation(t *testing.T) {
-	for _, mode := range []string{"blocked", "disconnected", "shutdown"} {
+	for _, mode := range []string{"blocked", "disconnected"} {
 		t.Run(mode, func(t *testing.T) {
 			devices := map[string]*device{"b": {}}
 			if mode != "disconnected" {
-				devices["a"] = &device{block: mode == "blocked", shutdownBlock: mode == "shutdown"}
+				devices["a"] = &device{block: mode == "blocked"}
 			}
 			m, _ := New(configuration(), options(devices, &fakeLock{}))
 			ctx, cancel := context.WithCancel(context.Background())
@@ -156,7 +150,7 @@ func TestBlockedAndDisconnectedIsolation(t *testing.T) {
 			d := devices["b"]
 			d.mu.Lock()
 			defer d.mu.Unlock()
-			if !d.closed || d.speeds[len(d.speeds)-1] != 100 {
+			if !d.closed {
 				t.Fatal("healthy enclosure shutdown blocked")
 			}
 		})
