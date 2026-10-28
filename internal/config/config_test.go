@@ -16,7 +16,7 @@ func TestDefaultsAndMultiple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if DefaultPath != "/etc/sc200/config.yaml" || ShutdownSpeed != 100 {
+	if DefaultPath != "/etc/sc200/config.yaml" || MaxSpeed != 100 {
 		t.Fatal("shared paths/safety contract changed")
 	}
 	e := c.Enclosures[0]
@@ -63,7 +63,7 @@ func TestValidationBoundaries(t *testing.T) {
 		"bad id": func(e *Enclosure) { e.ID = "../bad" }, "relative port": func(e *Enclosure) { e.Port = "ttyS0" }, "root port": func(e *Enclosure) { e.Port = "/" }, "baud": func(e *Enclosure) { e.Baud = 1 },
 		"poll": func(e *Enclosure) { e.PollInterval = 0 }, "timeout": func(e *Enclosure) { e.CommandTimeout = -1 }, "stale": func(e *Enclosure) { e.StaleAfter = 0 }, "refresh": func(e *Enclosure) { e.RefreshInterval = 0 }, "cooldown": func(e *Enclosure) { e.Cooldown = 0 }, "reconnect min": func(e *Enclosure) { e.ReconnectMin = 0 }, "reconnect max": func(e *Enclosure) { e.ReconnectMax = 0 }, "reconnect order": func(e *Enclosure) { e.ReconnectMax = time.Millisecond }, "recovery": func(e *Enclosure) { e.RecoverySamples = 0 },
 		"timeout relation": func(e *Enclosure) { e.CommandTimeout = e.PollInterval }, "stale relation": func(e *Enclosure) { e.StaleAfter = e.PollInterval }, "transaction budget": func(e *Enclosure) { e.StaleAfter = e.PollInterval + e.CommandTimeout },
-		"zero min": func(e *Enclosure) { e.MinSpeed = 0 }, "max min": func(e *Enclosure) { e.MinSpeed = 101 }, "safe min": func(e *Enclosure) { e.SafeSpeed = 19 }, "safe max": func(e *Enclosure) { e.SafeSpeed = 101 }, "unsafe curve": func(e *Enclosure) { e.SafeSpeed = 99 },
+		"zero min": func(e *Enclosure) { e.MinSpeed = 0 }, "max min": func(e *Enclosure) { e.MinSpeed = 101 }, "safe min": func(e *Enclosure) { e.SafeSpeed = 19 }, "safe max": func(e *Enclosure) { e.SafeSpeed = 101 }, "unsafe curve": func(e *Enclosure) { e.Curve[4].Speed = 101 },
 		"hysteresis": func(e *Enclosure) { e.Hysteresis = -1 }, "nan hysteresis": func(e *Enclosure) { e.Hysteresis = math.NaN() }, "inf critical": func(e *Enclosure) { e.CriticalTemperature = math.Inf(1) }, "critical low": func(e *Enclosure) { e.CriticalTemperature = 25 }, "critical high": func(e *Enclosure) { e.CriticalTemperature = 46 },
 		"short curve": func(e *Enclosure) { e.Curve = e.Curve[:1] }, "infinite point": func(e *Enclosure) { e.Curve[0].Temperature = math.Inf(-1) }, "curve low": func(e *Enclosure) { e.Curve[0].Speed = 19 }, "curve temp": func(e *Enclosure) { e.Curve[1].Temperature = 25 }, "curve speed": func(e *Enclosure) { e.Curve[2].Speed = 20 }, "negative sensor": func(e *Enclosure) { e.RequiredSensors = []int{-1} }, "duplicate sensor": func(e *Enclosure) { e.RequiredSensors = []int{1, 1} }, "empty sensors": func(e *Enclosure) { e.RequiredSensors = []int{} },
 	}
@@ -144,5 +144,31 @@ func TestDryRun(t *testing.T) {
 	}
 	if _, err := Decode(strings.NewReader("dry_run: invalid\n" + minimal)); err == nil {
 		t.Fatal("accepted invalid dry_run")
+	}
+}
+
+func TestGenerationProfiles(t *testing.T) {
+	for _, name := range []string{"safe", "quiet"} {
+		e, err := EnclosureProfile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.ID, e.Port = "test", "/dev/test"
+		if err := e.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		e.Curve[0].Speed = 99
+		fresh, _ := EnclosureProfile(name)
+		if fresh.Curve[0].Speed == 99 {
+			t.Fatal("profile shares mutable curve")
+		}
+	}
+	if _, err := EnclosureProfile("unknown"); err == nil {
+		t.Fatal("unknown profile accepted")
+	}
+	// Fallback is independent of the curve maximum, including in handwritten YAML.
+	c, err := Decode(strings.NewReader(minimal + "    safe_speed: 20\n"))
+	if err != nil || c.Enclosures[0].Curve[4].Speed != 100 {
+		t.Fatalf("curve above fallback rejected: %v", err)
 	}
 }

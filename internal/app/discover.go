@@ -27,6 +27,7 @@ func discover(ctx context.Context, args []string, out, diag io.Writer, o Options
 	path := f.String("config", config.DefaultPath, "configuration path")
 	write := f.Bool("write", false, "atomically append discoveries; restart service to apply")
 	verbose := f.Bool("verbose", false, "show failures for every probed port")
+	profile := f.String("profile", "safe", "generation template: safe or quiet (new enclosures only)")
 	baud := f.Int("baud", 38400, "serial baud")
 	var ports portsFlag
 	f.Var(&ports, "port", "probe only this port (repeatable)")
@@ -39,6 +40,12 @@ func discover(ctx context.Context, args []string, out, diag io.Writer, o Options
 	if f.NArg() != 0 || *path == "" {
 		return 2
 	}
+	template, err := config.EnclosureProfile(*profile)
+	if err != nil {
+		_, _ = fmt.Fprintln(diag, err)
+		return 2
+	}
+
 	scan := o.Discover
 	if scan == nil {
 		scan = func(ctx context.Context, p []string, b int) (discovery.Result, error) {
@@ -68,6 +75,13 @@ func discover(ctx context.Context, args []string, out, diag io.Writer, o Options
 		_, _ = fmt.Fprintln(diag, "no supported enclosures found; configuration unchanged")
 		return 3
 	}
+	for i := range r.Enclosures {
+		e := &r.Enclosures[i]
+		e.MinSpeed, e.SafeSpeed = template.MinSpeed, template.SafeSpeed
+		e.CriticalTemperature, e.Hysteresis = template.CriticalTemperature, template.Hysteresis
+		e.Curve = append([]config.Point(nil), template.Curve...)
+	}
+
 	identity := o.DiscoveryIdentity
 	if identity == nil {
 		identity = discovery.Identity

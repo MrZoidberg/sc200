@@ -159,3 +159,43 @@ func TestDiscoverProbeDiagnostics(t *testing.T) {
 		})
 	}
 }
+
+func TestDiscoverProfilesPreserveExisting(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	e := config.DefaultEnclosure()
+	e.ID, e.Port, e.Baud, e.RequiredSensors = "existing", "/dev/existing", 57600, []int{1, 3}
+	opts := Options{Discover: func(context.Context, []string, int) (discovery.Result, error) {
+		return discovery.Result{Enclosures: []config.Enclosure{e}}, nil
+	}, DiscoveryIdentity: func(p string) (string, error) { return p, nil }}
+	var out, diag bytes.Buffer
+	if code := Run(context.Background(), []string{"discover", "--config", path, "--write"}, &out, &diag, opts); code != 0 {
+		t.Fatal(code, diag.String())
+	}
+	out.Reset()
+	opts.Discover = func(context.Context, []string, int) (discovery.Result, error) {
+		added := e
+		added.ID, added.Port = "new", "/dev/new"
+		return discovery.Result{Enclosures: []config.Enclosure{e, added}}, nil
+	}
+	if code := Run(context.Background(), []string{"discover", "--config", path, "--profile", "quiet", "--write"}, &out, &diag, opts); code != 0 {
+		t.Fatal(code, diag.String())
+	}
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Enclosures) != 2 || c.Enclosures[0].SafeSpeed != 100 || c.Enclosures[0].Curve[3].Speed != 75 {
+		t.Fatalf("existing config changed: %+v", c)
+	}
+	q := c.Enclosures[1]
+	if q.SafeSpeed != 15 || q.MinSpeed != 10 || q.Curve[3].Speed != 15 || q.Curve[4].Speed != 20 || q.Baud != 57600 || len(q.RequiredSensors) != 2 || q.RequiredSensors[1] != 3 {
+		t.Fatalf("incorrect generated quiet config: %+v", q)
+	}
+	opts.Discover = func(context.Context, []string, int) (discovery.Result, error) {
+		t.Fatal("invalid profile opened hardware")
+		return discovery.Result{}, nil
+	}
+	if code := Run(context.Background(), []string{"discover", "--profile", "unknown"}, &out, &diag, opts); code != 2 {
+		t.Fatal(code)
+	}
+}

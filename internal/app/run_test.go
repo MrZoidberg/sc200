@@ -109,7 +109,7 @@ func TestLifecycle(t *testing.T) {
 		name                          string
 		serveErr, managerErr, httpErr error
 		code                          int
-	}{{name: "cancellation"}, {name: "HTTP fatal", serveErr: errors.New("serve failed"), code: 1}, {name: "shutdown write failure", managerErr: errors.New("safe write failed"), code: 1}, {name: "HTTP shutdown failure", httpErr: errors.New("shutdown failed"), code: 1}} {
+	}{{name: "cancellation"}, {name: "HTTP fatal", serveErr: errors.New("serve failed"), code: 1}, {name: "shutdown cleanup failure", managerErr: errors.New("close failed"), code: 1}, {name: "HTTP shutdown failure", httpErr: errors.New("shutdown failed"), code: 1}} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := &fakeManager{stopErr: tc.managerErr}
 			h := &fakeHTTP{serveErr: tc.serveErr, stopErr: tc.httpErr, started: make(chan struct{}), done: make(chan struct{})}
@@ -251,8 +251,8 @@ func TestTransientDeviceFailureKeepsServing(t *testing.T) {
 	cancel()
 	select {
 	case code := <-done:
-		if code != 1 {
-			t.Fatalf("unavailable shutdown must be reported: %d", code)
+		if code != 0 {
+			t.Fatalf("disconnected cleanup failed: %d", code)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("cleanup hung")

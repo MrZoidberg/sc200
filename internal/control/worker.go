@@ -111,9 +111,6 @@ func (w *Worker) command(ctx context.Context, target int, kind string) error {
 		if kind == "fallback" {
 			s.Operations.Fallback++
 		}
-		if kind == "shutdown" {
-			s.Operations.Shutdown++
-		}
 	})
 	budget := w.cfg.CommandTimeout
 	if kind == "" {
@@ -127,9 +124,6 @@ func (w *Worker) command(ctx context.Context, target int, kind string) error {
 			s.Errors.Command++
 			if kind == "fallback" {
 				s.Errors.Fallback++
-			}
-			if kind == "shutdown" {
-				s.Errors.Shutdown++
 			}
 		} else {
 			s.CompletedCommand = target
@@ -323,9 +317,8 @@ func (w *Worker) Run(ctx context.Context) {
 	})
 }
 
-// Shutdown is idempotent and must follow starting Run. A failed final transaction
-// leaves CompletedCommand unchanged; the target only records the shutdown request.
-func (w *Worker) Shutdown(ctx context.Context) error {
+// Shutdown is idempotent and must follow starting Run. It leaves fan speed unchanged.
+func (w *Worker) Shutdown(_ context.Context) error {
 	w.stopOnce.Do(func() {
 		w.mu.RLock()
 		cancel := w.cancel
@@ -335,14 +328,14 @@ func (w *Worker) Shutdown(ctx context.Context) error {
 		// can be closed. An already expired shutdown deadline must not skip device
 		// cleanup and allow the manager to release ownership while a port is open.
 		<-w.done
-		w.transition(Stopping, "shutdown", config.ShutdownSpeed, false)
+		w.transition(Stopping, "shutdown", w.Snapshot().Target, false)
+		w.update(func(s *Snapshot) { s.Operations.Shutdown++ })
 		if w.controller != nil {
-			w.stopErr = w.command(ctx, config.ShutdownSpeed, "shutdown")
-			w.stopErr = errors.Join(w.stopErr, w.controller.Close())
+			w.stopErr = w.controller.Close()
 			w.controller = nil
-		} else {
-			w.update(func(s *Snapshot) { s.Operations.Shutdown++; s.Errors.Shutdown++ })
-			w.stopErr = errors.Join(ctx.Err(), errors.New("shutdown safe-speed unavailable: disconnected"))
+		}
+		if w.stopErr != nil {
+			w.update(func(s *Snapshot) { s.Errors.Shutdown++ })
 		}
 	})
 	return w.stopErr

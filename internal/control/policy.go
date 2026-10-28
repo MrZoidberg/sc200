@@ -84,7 +84,7 @@ func EvaluatePolicy(c config.Enclosure, previous PolicyState, in PolicyInput) (P
 		}
 	}
 	if emergency {
-		return fail("critical_temperature", config.ShutdownSpeed)
+		return fail("critical_temperature", config.MaxSpeed)
 	}
 	if len(s.RequiredSensors) == 0 {
 		return fail("missing_sensor", c.SafeSpeed)
@@ -106,7 +106,7 @@ func EvaluatePolicy(c config.Enclosure, previous PolicyState, in PolicyInput) (P
 		if f.Installed {
 			installedFans++
 			if !f.Healthy() {
-				return fail("fan_fault", config.ShutdownSpeed)
+				return fail("fan_fault", config.MaxSpeed)
 			}
 		}
 	}
@@ -162,7 +162,7 @@ func EvaluatePolicy(c config.Enclosure, previous PolicyState, in PolicyInput) (P
 }
 
 // CurveSpeed interpolates the configured curve, rounds toward more cooling, and
-// clamps to the configured minimum and curve maximum (bounded by safe speed).
+// clamps to the configured minimum and curve maximum (bounded by 100%).
 func CurveSpeed(c config.Enclosure, temperature float64) int {
 	speed := float64(c.Curve[len(c.Curve)-1].Speed)
 	if temperature <= c.Curve[0].Temperature {
@@ -176,5 +176,5 @@ func CurveSpeed(c config.Enclosure, temperature float64) int {
 			}
 		}
 	}
-	return max(c.MinSpeed, min(c.SafeSpeed, int(math.Ceil(speed))))
+	return max(c.MinSpeed, min(config.MaxSpeed, int(math.Ceil(speed))))
 }

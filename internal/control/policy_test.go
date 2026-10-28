@@ -152,3 +152,60 @@ func TestOscillationAndControlRecovery(t *testing.T) {
 		t.Fatal("state alias")
 	}
 }
+
+func TestQuietProfilePolicy(t *testing.T) {
+	c, err := config.EnclosureProfile("quiet")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ temperature, speed int }{{20, 10}, {30, 10}, {35, 12}, {38, 14}, {40, 15}, {41, 20}, {44, 20}} {
+		if got := CurveSpeed(c, float64(tc.temperature)); got != tc.speed {
+			t.Fatalf("%d°C: got %d want %d", tc.temperature, got, tc.speed)
+		}
+	}
+	// A custom curve may reach 100% even with a 15% fallback.
+	custom := c
+	custom.Curve = []config.Point{{Temperature: 25, Speed: 10}, {Temperature: 45, Speed: 100}}
+	if CurveSpeed(custom, 50) != 100 {
+		t.Fatal("fallback clamps curve")
+	}
+	now := time.Unix(100, 0)
+	c.RecoverySamples = 1
+	s, d := EvaluatePolicy(c, PolicyState{}, sample(now, 40))
+	if !d.Healthy || d.Target != 15 {
+		t.Fatal(d)
+	}
+	s, d = EvaluatePolicy(c, s, sample(now.Add(time.Second), 41))
+	if d.Target != 20 {
+		t.Fatal("rise above fallback delayed", d)
+	}
+	s, d = EvaluatePolicy(c, s, sample(now.Add(2*time.Second), 40))
+	if d.Target != 20 || s.ReductionPending {
+		t.Fatal("hysteresis ignored", d)
+	}
+	s, _ = EvaluatePolicy(c, s, sample(now.Add(3*time.Second), 38))
+	_, d = EvaluatePolicy(c, s, sample(now.Add(3*time.Second+c.Cooldown), 38))
+	if d.Target != 15 {
+		t.Fatal("cooldown reduction", d)
+	}
+	for _, failure := range []string{"unavailable", "stale", "critical", "fan"} {
+		i := sample(now, 40)
+		want := 15
+		switch failure {
+		case "unavailable":
+			i.Map.Temperatures[0].Available = false
+		case "stale":
+			i.Now = now.Add(c.StaleAfter)
+		case "critical":
+			i.Map.Temperatures[0].Celsius = 45
+			want = 100
+		case "fan":
+			i.Map.Fans[0].Failed = true
+			want = 100
+		}
+		_, d := EvaluatePolicy(c, s, i)
+		if d.Target != want || d.Healthy {
+			t.Fatalf("%s: %+v", failure, d)
+		}
+	}
+}

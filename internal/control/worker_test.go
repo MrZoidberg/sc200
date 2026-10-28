@@ -60,12 +60,13 @@ func (c *testClock) paused(t *testing.T) timerRequest {
 }
 
 type fakeController struct {
-	mu     sync.Mutex
-	speeds []int
-	reads  int
-	closed bool
-	read   func(context.Context, int) (protocol.Map, error)
-	write  func(context.Context, int, int) error
+	mu       sync.Mutex
+	speeds   []int
+	reads    int
+	closed   bool
+	closeErr error
+	read     func(context.Context, int) (protocol.Map, error)
+	write    func(context.Context, int, int) error
 }
 
 func (f *fakeController) ReadMap(ctx context.Context) (protocol.Map, error) {
@@ -88,7 +89,12 @@ func (f *fakeController) SetSpeed(ctx context.Context, n int) error {
 	}
 	return nil
 }
-func (f *fakeController) Close() error { f.mu.Lock(); f.closed = true; f.mu.Unlock(); return nil }
+func (f *fakeController) Close() error {
+	f.mu.Lock()
+	f.closed = true
+	f.mu.Unlock()
+	return f.closeErr
+}
 func (f *fakeController) commands() []int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -155,7 +161,7 @@ func TestWorkerRecoveryRefreshSnapshotShutdown(t *testing.T) {
 	if err := w.Shutdown(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if s = w.Snapshot(); s.State != Stopping || s.Target != 100 || s.CompletedCommand != 100 || s.Operations.Shutdown != 1 {
+	if s = w.Snapshot(); s.State != Stopping || s.Target != 24 || s.CompletedCommand != 24 || s.Operations.Shutdown != 1 || len(f.commands()) != 3 {
 		t.Fatalf("stop %+v", s)
 	}
 	if err := w.Shutdown(ctx); err != nil {
@@ -225,11 +231,11 @@ func TestWorkerBackoffAndDisconnectedShutdown(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if w.Shutdown(ctx) == nil {
-		t.Fatal("unavailable shutdown reported success")
+	if err := w.Shutdown(ctx); err != nil {
+		t.Fatal(err)
 	}
-	if w.Snapshot().Errors.Shutdown != 1 {
-		t.Fatal("missing shutdown failure")
+	if w.Snapshot().Errors.Shutdown != 0 {
+		t.Fatal("disconnected cleanup reported a failure")
 	}
 }
 func TestWorkerStallFreshnessAndCancellation(t *testing.T) {
@@ -259,9 +265,10 @@ func TestWorkerStallFreshnessAndCancellation(t *testing.T) {
 	if s.Fresh || s.Healthy || s.Target != 100 || s.State != Failsafe || s.Reason != "stale_telemetry" || !s.TransitionTime.Equal(before.LastTelemetry.Add(c.StaleAfter)) {
 		t.Fatalf("stale %+v", s)
 	}
+	commandsBefore := len(f.commands())
 	stopWorker(t, w)
-	if last := f.commands(); last[len(last)-1] != 100 {
-		t.Fatalf("shutdown command %v", last)
+	if len(f.commands()) != commandsBefore {
+		t.Fatal("shutdown changed fan speed")
 	}
 }
 func TestWorkerTelemetryFailureFallbackAndReconnectRecovery(t *testing.T) {
@@ -297,9 +304,9 @@ func TestWorkerTelemetryFailureFallbackAndReconnectRecovery(t *testing.T) {
 		t.Fatal("did not recover")
 	}
 }
-func TestWorkerStartupFailureAndShutdownFailure(t *testing.T) {
+func TestWorkerStartupFailureAndShutdownWithoutWrite(t *testing.T) {
 	for _, startup := range []bool{true, false} {
-		t.Run(map[bool]string{true: "startup", false: "shutdown"}[startup], func(t *testing.T) {
+		t.Run(map[bool]string{true: "startup failure", false: "shutdown skips writes"}[startup], func(t *testing.T) {
 			c := workerConfig()
 			clock := newClock()
 			f := &fakeController{write: func(_ context.Context, _ int, n int) error {
@@ -316,8 +323,8 @@ func TestWorkerStartupFailureAndShutdownFailure(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			if w.Shutdown(ctx) == nil {
-				t.Fatal("shutdown failure hidden")
+			if err := w.Shutdown(ctx); err != nil {
+				t.Fatal(err)
 			}
 			if w.Snapshot().CompletedCommand != s.CompletedCommand {
 				t.Fatal("failed command changed completion")
@@ -398,7 +405,7 @@ func TestWorkerParentCancellationAndShutdownBudget(t *testing.T) {
 	default:
 	}
 	close(release)
-	if err := <-stopped; !errors.Is(err, context.Canceled) {
+	if err := <-stopped; err != nil {
 		t.Fatalf("shutdown budget %v", err)
 	}
 	select {
@@ -416,7 +423,7 @@ func TestWorkerExpiredShutdownStillClosesController(t *testing.T) {
 	_ = clock.paused(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := w.Shutdown(ctx); !errors.Is(err, context.Canceled) {
+	if err := w.Shutdown(ctx); err != nil {
 		t.Fatalf("shutdown error: %v", err)
 	}
 	f.mu.Lock()
@@ -573,7 +580,6 @@ func TestSpeedChangeLogs(t *testing.T) {
 		{name: "failed", previous: 50, target: 30, failed: true},
 		{name: "startup", target: 100, initial: true, kind: "fallback", want: "temperatures_celsius=unavailable"},
 		{name: "stale fallback", previous: 30, target: 100, stale: true, kind: "fallback", want: "temperatures_celsius=unavailable"},
-		{name: "shutdown", previous: 30, target: 100, kind: "shutdown", want: "temperatures_celsius=0:25"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var logs bytes.Buffer
@@ -660,13 +666,44 @@ func TestDryRunPollingRefreshFallbackShutdown(t *testing.T) {
 				t.Fatal(logs.String())
 			}
 			if !failedRead {
-				for _, want := range []string{"temperatures_celsius=0:25", "changed=false", "command=shutdown"} {
+				for _, want := range []string{"temperatures_celsius=0:25", "changed=false"} {
 					if !strings.Contains(logs.String(), want) {
 						t.Fatalf("missing %s: %s", want, logs.String())
 					}
 				}
 			} else if strings.Count(logs.String(), "command=fallback") != 2 {
 				t.Fatal(logs.String())
+			}
+		})
+	}
+}
+
+func TestShutdownPreservesQuietSpeedAndReportsCloseError(t *testing.T) {
+	for _, dryRun := range []bool{false, true} {
+		t.Run(fmt.Sprint(dryRun), func(t *testing.T) {
+			c, err := config.EnclosureProfile("quiet")
+			if err != nil {
+				t.Fatal(err)
+			}
+			clock := newClock()
+			closeErr := errors.New("close failed")
+			f := &fakeController{closeErr: closeErr}
+			w := NewWorker(c, func(context.Context, config.Enclosure) (serial.Controller, error) { return f, nil }, clock, WorkerOptions{DryRun: dryRun})
+			go w.Run(context.Background())
+			_ = clock.paused(t)
+			before := w.Snapshot()
+			if before.Target != 15 {
+				t.Fatal("quiet startup fallback", before)
+			}
+			commands := len(f.commands())
+			for range 2 {
+				if err := w.Shutdown(context.Background()); !errors.Is(err, closeErr) {
+					t.Fatal("close error lost", err)
+				}
+			}
+			after := w.Snapshot()
+			if !f.closed || len(f.commands()) != commands || after.CompletedCommand != before.CompletedCommand || after.SimulatedCommand != before.SimulatedCommand || after.Target != before.Target || after.Operations.Shutdown != 1 || after.Errors.Shutdown != 1 {
+				t.Fatalf("shutdown changed commands or cleanup was not idempotent: %+v", after)
 			}
 		})
 	}
