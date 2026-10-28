@@ -14,10 +14,12 @@ Console compatibility is based on firmware `12Pack.Slot0.101`; other firmware an
 Download and review the [installer](https://github.com/MrZoidberg/sc200/blob/master/scripts/install.sh), then run it on the Linux host connected to your enclosure:
 
 ```sh
-sudo bash scripts/install.sh
+curl -fsSLo install.sh https://sc200.merkulov.me/install.sh
+less install.sh
+sudo bash install.sh
 ```
 
-This command assumes you saved the installer as `scripts/install.sh`. It needs systemd, curl, GNU tar, sha256sum, and standard Linux account-management tools. Go is not required.
+The hosted installer becomes available with the first stable release containing the website. It needs systemd, curl, GNU tar, sha256sum, and standard Linux account-management tools. Go is not required.
 
 The installer downloads the latest release, checks its SHA-256 checksum, and installs the binary, systemd service, and example configuration. It uses the `sc200` service account and the `dialout` serial group by default. Use `--serial-group GROUP` if your devices belong to another group.
 

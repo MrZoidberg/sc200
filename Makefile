@@ -51,7 +51,7 @@ release-check:
 snapshot: release-check
 	goreleaser release --snapshot --clean
 	python3 scripts/checkrelease.py dist
-quality: fmt-check vet coverage lint installer-check unit-check cross-build workflow-check snapshot
+quality: website-check fmt-check vet coverage lint installer-check unit-check cross-build workflow-check snapshot
 
 .PHONY: shellcheck-version
 shellcheck-version:
@@ -60,3 +60,8 @@ shellcheck-version:
 .PHONY: goreleaser-version
 goreleaser-version:
 	@echo $(GORELEASER_VERSION)
+
+.PHONY: website-build website-check
+website-build:
+	python3 scripts/website.py
+website-check: website-build

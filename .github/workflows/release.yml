@@ -55,3 +55,27 @@ jobs:
         run: .tools/bin/goreleaser release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  website:
+    needs: publish
+    if: github.repository == 'MrZoidberg/sc200' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    environment: cloudflare-production
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: make website-build
+        env:
+          WEBSITE_VERSION: ${{ github.ref_name }}
+      - name: Deploy to Cloudflare Pages
+        run: npx --yes wrangler@4.45.0 pages deploy dist/website --project-name=sc200 --branch=master
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Verify public website
+        run: bash scripts/checkwebsite.sh
+        env:
+          WEBSITE_VERSION: ${{ github.ref_name }}

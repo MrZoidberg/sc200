@@ -26,3 +26,34 @@ Archive names are `sc200_VERSION_linux_amd64.tar.gz` and `sc200_VERSION_linux_ar
 After review and merge, an authorized maintainer can select a real version, create an annotated `vX.Y.Z` tag on the accepted commit, push that tag and inspect the release workflow/assets. Tag/push/publish are explicit external actions; implementation verification has not performed them or verified live GitHub execution. Test a real release install on a suitable Linux host afterward. Publishing a gist, configuring production Prometheus, editing cron, installation and systemd activation are likewise separate operator actions.
 
 Hardware commissioning remains mandatory: see [hardware.md](hardware.md). Unit tests establish decoding/control decisions and bounded failure behavior, not physical speed acknowledgement, firmware persistence, qualified thermal limits or live systemd device permissions.
+
+## Project website
+
+The independent Cloudflare Pages project `sc200` serves `sc200.merkulov.me`.
+Run `make website-check` and preview with
+`python3 -m http.server --directory dist/website 8000`.
+Set `WEBSITE_VERSION=vX.Y.Z` for a release build. The installer is copied directly
+from `scripts/install.sh`; edit only that source.
+
+One-time setup: create a Direct Upload Pages project named `sc200`, production
+branch `master`. Configure repository Actions secrets `CLOUDFLARE_ACCOUNT_ID`
+and `CLOUDFLARE_API_TOKEN` (Pages Edit permission scoped to the account).
+Add `sc200.merkulov.me` in the project's custom-domain settings and confirm the
+CNAME to its assigned Pages hostname. Wait for domain and certificate activation.
+
+The release workflow deploys only after successful publication of a stable tag.
+PRs and master pushes validate without publishing. Retry a failed website job
+using GitHub Actions' rerun failed jobs; this does not republish the release.
+Use Pages deployment history to roll back the website if necessary. Binary
+releases remain on GitHub and the installer still defaults to the latest release.
+
+### Deployment secret isolation
+
+Store both Cloudflare values as **environment secrets** in `cloudflare-production`,
+not repository or organization secrets. Remove repository-level copies after adding
+them to the environment. GitHub cannot reveal or automatically move existing secrets;
+re-enter the values in Settings → Environments → cloudflare-production.
+The environment requires approval from MrZoidberg, disallows administrator bypass,
+and accepts only `v*` tags. Self-approval is allowed so the repository owner can
+approve their own releases. PR CI has no environment or deployment secrets.
+Approval to run a fork's CI does not grant deployment approval or secrets.

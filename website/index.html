@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Temperature-aware fan control for Dell SC200 enclosures on Linux.">
+    <title>sc200 · Enclosure fan control</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+    <header><span>DELL SC200 / LINUX</span><h1>Keep your enclosure<br>under control.</h1><p>Temperature-aware fan control for Dell SC200 enclosures. One daemon, multiple enclosures, and a clear view of cooling.</p></header>
+    <section><h2>Built for your homelab</h2><ul><li>Temperature-based fan curves with hysteresis and configurable fallback speeds.</li><li>Interactive device discovery and setup, plus dry run before enabling control.</li><li>Prometheus metrics, a Grafana dashboard, and JSON health reporting.</li></ul></section>
+    <section><h2>Install sc200</h2><p>Requires Linux amd64 or arm64, systemd, curl, GNU tar, sha256sum, and standard account-management tools. Download and review the installer, then run it as root:</p><pre><code>curl -fsSLo install.sh https://sc200.merkulov.me/install.sh
+less install.sh
+sudo bash install.sh</code></pre><p>The installer verifies release checksums and opens interactive setup. It downloads the latest GitHub release by default; use <code>--version vX.Y.Z</code> to select a release.</p><p><a href="/install.sh">Read the installer</a> · <a href="https://github.com/MrZoidberg/sc200/releases">Download releases</a></p></section>
+    <aside><h2>Check your cooling</h2><p>Compatibility is based on firmware <code>12Pack.Slot0.101</code>. Verify temperatures under sustained load. If the host, daemon, or serial connection fails, sc200 cannot enforce cooling. Disable old fan-control jobs before setup.</p></aside>
+    <nav aria-label="Documentation"><a href="https://github.com/MrZoidberg/sc200">GitHub</a><a href="https://github.com/MrZoidberg/sc200/blob/master/docs/configuration.md">Configuration</a><a href="https://github.com/MrZoidberg/sc200/blob/master/docs/operations.md">Operations</a><a href="https://github.com/MrZoidberg/sc200/blob/master/docs/hardware.md">Hardware</a></nav>
+    <footer>Published from <a href="https://github.com/MrZoidberg/sc200/tree/@VERSION@">@VERSION@</a>.</footer>
+</main>
+</body>
+</html>
