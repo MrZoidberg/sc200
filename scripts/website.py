@@ -1,4 +1,5 @@
 """Build and validate the release website without third-party dependencies."""
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -13,7 +14,12 @@ out = root / "dist/website"
 shutil.rmtree(out, ignore_errors=True)
 shutil.copytree(root / "website", out)
 page = out / "index.html"
-page.write_text(page.read_text().replace("@VERSION@", version))
+# Fingerprint CSS so updated pages cannot reuse an older cached stylesheet.
+stylesheet = out / "style.css"
+css_name = f"style-{hashlib.sha256(stylesheet.read_bytes()).hexdigest()[:12]}.css"
+stylesheet.rename(out / css_name)
+for html in out.glob("*.html"):
+    html.write_text(html.read_text().replace("@VERSION@", version).replace("/style.css", f"/{css_name}"))
 shutil.copyfile(root / "scripts/install.sh", out / "install.sh")
 
 class Links(HTMLParser):
