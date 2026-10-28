@@ -64,7 +64,11 @@ chmod +x "$suite/stubs/"*
 cat > "$suite/payload/sc200" <<'STUB'
 #!/usr/bin/env bash
 printf 'validate %s\n' "$*" >> "$TEST_LOG"
-[[ ${TEST_VALIDATE_FAIL:-0} == 0 ]]
+printf 'Configuration valid: test fixture\n'
+if [[ ${TEST_VALIDATE_FAIL:-0} != 0 ]]; then
+  printf 'test configuration invalid\n' >&2
+  exit 1
+fi
 STUB
 chmod +x "$suite/payload/sc200"
 cp "$repo/packaging/systemd/sc200.service" "$repo/packaging/systemd/sc200.conf" "$repo/LICENSE" "$repo/README.md" "$suite/payload/"
@@ -116,6 +120,7 @@ new_case; run_ok --no-setup --version v1.2.3
 grep -q "sc200 --setup" "$TEST_ROOT/output"
 new_case; existing; export TEST_ACTIVE=1; run_ok --version v1.2.3
 [[ $(cat "$SC200_INSTALL_ROOT/etc/sc200/config.yaml") == '# preserved configuration' ]]
+if grep -q 'Configuration valid:' "$TEST_ROOT/output"; then echo 'validation output leaked'; exit 1; fi
 awk '/validate/ {v=NR} /systemctl restart/ {if (!v || v>=NR) exit 1; found=1} END {if (!found) exit 1}' "$TEST_LOG"
 new_case; existing; run_ok --version v1.2.3 --start
 awk '/systemctl start/ {s=NR} /systemctl enable/ {if (!s || s>=NR) exit 1; found=1} END {if (!found) exit 1}' "$TEST_LOG"
@@ -133,6 +138,7 @@ new_case; export TEST_DOWNLOAD_FAIL=1; run_fail --version v1.2.3
 new_case; printf '%064d  sc200_1.2.3_linux_amd64.tar.gz\n' 0 > "$TEST_CHECKSUMS"; run_fail --version v1.2.3
 new_case; cat "$TEST_CHECKSUMS" >> "$TEST_ROOT/duplicate"; cat "$TEST_ROOT/duplicate" >> "$TEST_CHECKSUMS"; run_fail --version v1.2.3
 new_case; existing; export TEST_VALIDATE_FAIL=1 TEST_ACTIVE=1; run_fail --version v1.2.3
+grep -q "test configuration invalid" "$TEST_ROOT/output"
 [[ $(cat "$SC200_INSTALL_ROOT/usr/local/bin/sc200") == 'old binary' ]]
 if grep -q 'systemctl restart' "$TEST_LOG"; then exit 1; fi
 new_case; existing; export TEST_ACCOUNT_FAIL=1; run_fail --version v1.2.3

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/MrZoidberg/sc200/internal/discovery"
+	"github.com/charmbracelet/x/ansi"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -231,5 +233,59 @@ func TestSetupRetainsExistingDisabledAndGlobalSettings(t *testing.T) {
 	}
 	if code := setup(context.Background(), path, &out, &out, opts); code != 0 {
 		t.Fatal(out.String())
+	}
+}
+
+// Unused UART failures must not displace the device controls on an SSH terminal.
+func TestSetupLayoutWithUnusedUARTs(t *testing.T) {
+	for _, size := range []tea.WindowSizeMsg{{Width: 80, Height: 24}, {Width: 60, Height: 16}, {Width: 120, Height: 40}} {
+		for _, phase := range []string{"devices", "review"} {
+			t.Run(fmt.Sprintf("%s-%dx%d", phase, size.Width, size.Height), func(t *testing.T) {
+				m := setupModel{phase: phase, cfg: config.Default(), message: "Settings applied."}
+				for i := range 20 {
+					e := config.DefaultEnclosure()
+					e.ID = fmt.Sprintf("shelf-%02d", i)
+					e.Port = fmt.Sprintf("/dev/serial/by-id/%s-%02d", strings.Repeat("long-device-name", 5), i)
+					m.cfg.Enclosures = append(m.cfg.Enclosures, e)
+				}
+				for i := range 31 {
+					m.outcomes = append(m.outcomes, discovery.Outcome{Port: fmt.Sprintf("/dev/ttyS%d", i), Err: errors.New("input/output error")})
+				}
+				next, _ := m.Update(size)
+				m = next.(setupModel)
+				for i := range 20 {
+					content := m.View().Content
+					if !strings.Contains(content, fmt.Sprintf("> [x] shelf-%02d", i)) {
+						t.Fatalf("selected device hidden: %s", content)
+					}
+					if strings.Contains(content, "input/output error") {
+						t.Fatal("individual probe failures clutter selection")
+					}
+					if phase == "devices" && !strings.Contains(content, "Skipped 31") {
+						t.Fatal("missing failure summary")
+					}
+					if !strings.Contains(content, "Esc: cancel") {
+						t.Fatal("cancel control hidden")
+					}
+					lines := strings.Split(content, "\n")
+					if len(lines) > size.Height {
+						t.Fatalf("%d lines exceed %d rows:\n%s", len(lines), size.Height, content)
+					}
+					for _, line := range lines {
+						if ansi.StringWidth(line) > size.Width {
+							t.Fatalf("line wraps beyond %d columns: %s", size.Width, line)
+						}
+					}
+					if i < 19 {
+						m, _ = setupKey(t, m, tea.KeyDown)
+					}
+				}
+				next, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+				m = next.(setupModel)
+				if !strings.Contains(m.View().Content, "> [x] shelf-19") {
+					t.Fatal("resize lost selection")
+				}
+			})
+		}
 	}
 }

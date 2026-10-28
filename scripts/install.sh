@@ -103,7 +103,7 @@ chmod 0755 "$work/unpacked/sc200"
 active=false
 if systemctl is-active --quiet sc200.service; then active=true; fi
 if [[ -e $conf ]]; then
-  "$work/unpacked/sc200" --check-config --config "$conf" || fail 'existing configuration rejected; installed files unchanged'
+  "$work/unpacked/sc200" --check-config --config "$conf" >/dev/null || fail 'existing configuration rejected; installed files unchanged'
 elif $start || $active; then
   fail "configuration $config is absent; install without --start, then discover --write"
 fi
@@ -116,7 +116,7 @@ usermod --append --groups "$serial_group" "$account"
 # Check readability as the actual service identity before touching installed files.
 if [[ -e $conf ]]; then
   chmod 0755 "$work" "$work/unpacked"
-  runuser -u "$account" -- "$work/unpacked/sc200" --check-config --config "$conf" || fail 'service account cannot validate configuration'
+  runuser -u "$account" -- "$work/unpacked/sc200" --check-config --config "$conf" >/dev/null || fail 'service account cannot validate configuration'
 fi
 install -d -m 0755 "$root/usr/local/bin" "$root/etc/systemd/system" "$root/etc/tmpfiles.d"
 if [[ ! -d $(dirname "$conf") ]]; then
