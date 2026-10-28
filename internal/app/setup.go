@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/MrZoidberg/sc200/internal/config"
 	"github.com/MrZoidberg/sc200/internal/discovery"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type setupLoaded struct {
@@ -34,6 +35,7 @@ type setupModel struct {
 	message         string
 	err             error
 	start, accepted bool
+	width, height   int
 }
 
 func setup(ctx context.Context, path string, out, diag io.Writer, o Options) int {
@@ -148,6 +150,10 @@ func setup(ctx context.Context, path string, out, diag io.Writer, o Options) int
 
 func (m setupModel) Init() tea.Cmd { return m.load }
 func (m setupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if size, ok := msg.(tea.WindowSizeMsg); ok {
+		m.width, m.height = size.Width, size.Height
+		return m, nil
+	}
 	if r, ok := msg.(setupLoaded); ok {
 		m.cfg, m.original, m.outcomes, m.err = r.cfg, r.original, r.outcomes, r.err
 		if r.err != nil {
@@ -206,6 +212,18 @@ func (m setupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	if key == "up" || key == "k" {
+		if m.cursor > 0 {
+			m.cursor--
+		}
+		return m, nil
+	}
+	if key == "down" || key == "j" {
+		if m.cursor+1 < len(m.cfg.Enclosures) {
+			m.cursor++
+		}
+		return m, nil
+	}
 	if m.phase == "review" {
 		switch key {
 		case "s", "space", " ":
@@ -220,14 +238,6 @@ func (m setupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	n := len(m.cfg.Enclosures)
 	switch key {
-	case "up", "k":
-		if m.cursor > 0 {
-			m.cursor--
-		}
-	case "down", "j":
-		if m.cursor+1 < n {
-			m.cursor++
-		}
 	case "space", " ":
 		if n > 0 {
 			m.cfg.Enclosures[m.cursor].Enabled = !m.cfg.Enclosures[m.cursor].Enabled
@@ -323,9 +333,18 @@ func (m setupModel) View() tea.View {
 		if m.phase == "devices" {
 			b.WriteString("Select devices to control and configure each one.\n\n")
 		}
-		for i, e := range m.cfg.Enclosures {
+		height := m.height
+		if height == 0 {
+			height = 24
+		}
+		pageSize := max(1, (height-14)/3)
+		first := m.cursor / pageSize * pageSize
+		last := min(len(m.cfg.Enclosures), first+pageSize)
+		fmt.Fprintf(&b, "Devices %d–%d of %d (↑/↓ to browse)\n", first+1, last, len(m.cfg.Enclosures))
+		for i := first; i < last; i++ {
+			e := m.cfg.Enclosures[i]
 			cursor := " "
-			if i == m.cursor && m.phase == "devices" {
+			if i == m.cursor {
 				cursor = ">"
 			}
 			enabled := " "
@@ -350,18 +369,33 @@ func (m setupModel) View() tea.View {
 			if m.cfg.DryRun {
 				b.WriteString("Dry-run remains enabled: no fan speed writes.\n")
 			}
-			b.WriteString("S: toggle service start · Enter: save · Backspace: edit · Esc: cancel\n")
+			b.WriteString("↑/↓: browse · S: toggle service start\nEnter: save · Backspace: edit · Esc: cancel\n")
 		} else {
+			skipped := 0
 			for _, o := range m.outcomes {
 				if o.Err != nil {
-					fmt.Fprintf(&b, "\nSkipped %s: %v\n", o.Port, o.Err)
+					skipped++
 				}
 			}
-			b.WriteString("\n↑/↓: device · Space: enable/disable · S: safe · Q: quiet · C: custom\nEnter: review · Esc: cancel\nQuiet uses a 15% fallback; critical temperature and fan faults request 100%.\n")
+			if skipped > 0 {
+				fmt.Fprintf(&b, "Skipped %d unavailable or unsupported ports.\nDetails: sc200 discover --verbose\n", skipped)
+			}
+			b.WriteString("\n↑/↓: device · Space: enable/disable\nS: safe · Q: quiet · C: custom · Enter: review · Esc: cancel\nQuiet fallback: 15%; critical temperature/fan faults: 100%.\n")
 		}
 	}
 	if m.message != "" {
 		fmt.Fprintf(&b, "\n%s\n", m.message)
 	}
-	return tea.NewView(b.String())
+	width := m.width
+	if width == 0 {
+		width = 80
+	}
+	if m.height > 0 && (m.height < 16 || width < 60) {
+		return tea.NewView("Terminal too small. Resize to at least 60×16.\nEsc: cancel")
+	}
+	lines := strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
+	for i, line := range lines {
+		lines[i] = ansi.Truncate(line, width, "…")
+	}
+	return tea.NewView(strings.Join(lines, "\n"))
 }
