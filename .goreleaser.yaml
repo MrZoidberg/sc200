@@ -1,5 +1,8 @@
 version: 2
 project_name: sc200
+release:
+  # Allow retrying publication after a partial upload or an earlier successful run.
+  replace_existing_artifacts: true
 builds:
   - id: sc200
     main: ./cmd/sc200

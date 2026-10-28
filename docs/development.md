@@ -57,3 +57,10 @@ The environment requires approval from MrZoidberg, disallows administrator bypas
 and accepts only `v*` tags. Self-approval is allowed so the repository owner can
 approve their own releases. PR CI has no environment or deployment secrets.
 Approval to run a fork's CI does not grant deployment approval or secrets.
+
+Release publication retries replace same-named GitHub release assets, including
+checksums, using GoReleaser's `release.replace_existing_artifacts` option. Retry
+only the original tag; never move a published tag to another commit. Rebuilt
+archives can differ (build timestamps are embedded), so archives and checksums
+must be treated as one publication. A workflow fix on master applies to new tags;
+rerunning an older tag still uses that tag's workflow and configuration.
