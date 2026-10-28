@@ -21,7 +21,7 @@ type collector struct {
 
 func newCollector(source Source, build BuildInfo) *collector {
 	c := &collector{source: source, build: build, desc: map[string]*prometheus.Desc{}}
-	for _, name := range []string{"dry_run", "simulated_command_percent", "target_percent", "completed_command_percent", "enclosure_healthy", "failsafe_active", "telemetry_fresh", "telemetry_last_success_timestamp_seconds", "command_last_success_timestamp_seconds"} {
+	for _, name := range []string{"target_percent", "completed_command_percent", "enclosure_healthy", "failsafe_active", "telemetry_fresh", "telemetry_last_success_timestamp_seconds", "command_last_success_timestamp_seconds"} {
 		c.desc[name] = prometheus.NewDesc("sc200_"+name, "Cached enclosure "+name+".", []string{"enclosure"}, nil)
 	}
 	c.desc["temperature_celsius"] = prometheus.NewDesc("sc200_temperature_celsius", "Current temperature in degrees Celsius.", []string{"enclosure", "sensor"}, nil)
@@ -47,10 +47,6 @@ func (c *collector) Collect(ch chan<- prometheus.Metric) {
 	}
 	emit("build_info", 1, c.build.Version, c.build.Commit, c.build.Date)
 	for _, s := range c.source.Snapshots() {
-		emit("dry_run", boolean(s.DryRun), s.ID)
-		if s.DryRun {
-			emit("simulated_command_percent", float64(s.SimulatedCommand), s.ID)
-		}
 		emit("target_percent", float64(s.Target), s.ID)
 		emit("completed_command_percent", float64(s.CompletedCommand), s.ID)
 		emit("enclosure_healthy", boolean(s.Healthy), s.ID)
