@@ -7,19 +7,19 @@ account=sc200
 serial_group=dialout
 config=/etc/sc200/config.yaml
 start=false
+setup=true
 usage() {
   cat <<'HELP'
 Usage: install.sh [--version vX.Y.Z] [--user NAME] [--serial-group GROUP]
-                  [--config /absolute/path] [--start]
+                  [--config /absolute/path] [--start] [--no-setup]
 Linux amd64/arm64; run as root. Defaults: latest GitHub release from
 MrZoidberg/sc200, user sc200, serial group dialout, /etc/sc200/config.yaml.
 Downloads require curl, GNU tar, sha256sum and standard Linux account/systemd tools.
 Checksums are fetched from the same HTTPS release (integrity, not a signature).
 Preserves active configuration; installs a disabled example as config.example.yaml
-beside it. Fresh installs do not start control. Review settings and run:
-  sudo sc200 discover --write
-  sudo sc200 --check-config
-  sudo systemctl enable --now sc200.service
+beside it. When control is stopped, launch sc200 --setup on the controlling terminal.
+The wizard discovers devices, configures control and optionally starts the service.
+Without a terminal (or with --no-setup), run sudo sc200 --setup later.
 --start validates real configuration before enabling/starting. An active service
 is restarted after a validated upgrade; failed restart restores its old binary.
 --config installs an explicit systemd ExecStart/ExecStartPre drop-in for that path;
@@ -42,6 +42,7 @@ while (($#)); do
       esac
       shift 2 ;;
     --start) start=true; shift ;;
+    --no-setup) setup=false; shift ;;
     *) fail "unknown option: $1" ;;
   esac
 done
@@ -173,5 +174,10 @@ elif $start; then
 fi
 printf 'Installed sc200 %s. Configuration preserved at %s.\n' "$version" "$config"
 if ! $active && ! $start; then
-  printf 'Control is stopped. Review %s/config.example.yaml, then run sudo sc200 discover --config %s --write; validate and enable explicitly.\n' "$(dirname "$config")" "$config"
+  if $setup && [[ -z $root ]] && { exec 3<>/dev/tty; } 2>/dev/null; then
+    "$bin" --setup --config "$conf" <&3 >&3 2>&3 || fail "setup did not complete; run sudo sc200 --setup --config $config to retry"
+    exec 3>&-
+  else
+    printf 'Control is stopped. Run sudo sc200 --setup --config %s to configure devices and optionally start the service.\n' "$config"
+  fi
 fi

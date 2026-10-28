@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/MrZoidberg/sc200/internal/buildinfo"
 	"github.com/MrZoidberg/sc200/internal/config"
 	"github.com/MrZoidberg/sc200/internal/control"
@@ -33,6 +35,9 @@ type HTTPServer interface {
 
 // Options injects process boundaries; nil fields use production implementations.
 type Options struct {
+	SetupUI           func(tea.Model) (tea.Model, error)
+	SetupInput        io.Reader
+	Systemctl         func(context.Context, ...string) error
 	Discover          func(context.Context, []string, int) (discovery.Result, error)
 	DiscoveryIdentity func(string) (string, error)
 	Load              func(string) (config.Config, error)
@@ -50,10 +55,11 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 	flags := flag.NewFlagSet("sc200", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	path := flags.String("config", config.DefaultPath, "configuration file path")
+	setupMode := flags.Bool("setup", false, "discover devices and configure control interactively")
 	check := flags.Bool("check-config", false, "validate configuration without hardware access")
 	version := flags.Bool("version", false, "print version metadata")
 	flags.Usage = func() {
-		_, _ = fmt.Fprintf(stderr, "Usage: sc200 [--config PATH] [--check-config | --version]\n       sc200 discover [--config PATH] [--port PATH] [--baud N] [--profile safe|quiet] [--verbose] [--write]\nDefault configuration: %s\n", config.DefaultPath)
+		_, _ = fmt.Fprintf(stderr, "Usage: sc200 [--config PATH] [--check-config | --version | --setup]\n       sc200 discover [--config PATH] [--port PATH] [--baud N] [--profile safe|quiet] [--verbose] [--write]\nDefault configuration: %s\n", config.DefaultPath)
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -62,9 +68,12 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 		}
 		return 2
 	}
-	if flags.NArg() != 0 || (*version && *check) || *path == "" {
+	if flags.NArg() != 0 || (*version && *check) || (*setupMode && (*version || *check)) || *path == "" {
 		flags.Usage()
 		return 2
+	}
+	if *setupMode {
+		return setup(ctx, *path, stdout, stderr, opts)
 	}
 	if *version {
 		if _, err := fmt.Fprintln(stdout, buildinfo.String()); err != nil {

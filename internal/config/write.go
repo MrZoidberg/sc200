@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"go.yaml.in/yaml/v3"
 	"golang.org/x/sys/unix"
@@ -14,6 +15,17 @@ import (
 // MergeFile previews or atomically extends a valid configuration. Identity must
 // follow device aliases; absent configured devices retain their canonical paths.
 func MergeFile(path string, additions []Enclosure, write bool, identity func(string) (string, error)) ([]byte, error) {
+	return mergeFile(path, additions, write, identity, nil, nil)
+}
+
+// SaveSetupFile atomically saves wizard choices, rejecting edits made since its preview.
+// Existing global settings and unrelated YAML nodes are preserved.
+func SaveSetupFile(path string, choices []Enclosure, original []byte, identity func(string) (string, error)) error {
+	_, err := mergeFile(path, choices, true, identity, choices, &original)
+	return err
+}
+
+func mergeFile(path string, additions []Enclosure, write bool, identity func(string) (string, error), choices []Enclosure, expected *[]byte) ([]byte, error) {
 	fail := func(err error) ([]byte, error) {
 		return nil, fmt.Errorf("configuration %s (check directory permissions and ownership): %w", path, err)
 	}
@@ -36,6 +48,9 @@ func MergeFile(path string, additions []Enclosure, write bool, identity func(str
 	}
 	original, err := os.ReadFile(path)
 	exists := err == nil
+	if expected != nil && !bytes.Equal(original, *expected) {
+		return fail(fmt.Errorf("configuration changed during setup; retry"))
+	}
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fail(err)
 	}
@@ -119,6 +134,27 @@ func MergeFile(path string, additions []Enclosure, write bool, identity func(str
 		sequence.Content = append(sequence.Content, &entry)
 		added = true
 	}
+	if choices != nil {
+		// Keep the sequence and document metadata while replacing reviewed entries.
+		for i := range sequence.Content {
+			var entry Enclosure
+			if err := sequence.Content[i].Decode(&entry); err != nil {
+				return fail(err)
+			}
+			for _, choice := range choices {
+				if choice.Port == entry.Port {
+					var updated yaml.Node
+					choice.ID = entry.ID
+					if err := updated.Encode(choice); err != nil {
+						return fail(err)
+					}
+					updateSetupMapping(sequence.Content[i], &updated)
+					break
+				}
+			}
+		}
+		added = true
+	}
 	data, err := yaml.Marshal(&root)
 	if err != nil {
 		return fail(err)
@@ -175,4 +211,30 @@ func MergeFile(path string, additions []Enclosure, write bool, identity func(str
 		return fail(err)
 	}
 	return data, nil
+}
+
+// updateSetupMapping keeps comments and formatting on unchanged values.
+func updateSetupMapping(current, updated *yaml.Node) {
+	for j := 0; j < len(updated.Content); j += 2 {
+		found := false
+		for k := 0; k < len(current.Content); k += 2 {
+			if current.Content[k].Value != updated.Content[j].Value {
+				continue
+			}
+			old := current.Content[k+1]
+			value := updated.Content[j+1]
+			var oldData, newData any
+			_ = old.Decode(&oldData)
+			_ = value.Decode(&newData)
+			if !reflect.DeepEqual(oldData, newData) {
+				value.HeadComment, value.LineComment, value.FootComment = old.HeadComment, old.LineComment, old.FootComment
+				current.Content[k+1] = value
+			}
+			found = true
+			break
+		}
+		if !found {
+			current.Content = append(current.Content, updated.Content[j], updated.Content[j+1])
+		}
+	}
 }

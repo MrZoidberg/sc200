@@ -222,3 +222,44 @@ func TestMergePreservesOwnership(t *testing.T) {
 		t.Fatalf("ownership/mode: %+v", st)
 	}
 }
+
+func TestSetupSaveUpdatesChoicesAndRejectsStalePreview(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	first := addition("/dev/a")
+	original, err := MergeFile(path, []Enclosure{first}, true, pathIdentity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original = []byte(strings.Replace(string(original), "enabled: true", "enabled: true # selected shelf", 1))
+	if err := os.WriteFile(path, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	second := addition("/dev/b")
+	second.ID = "second"
+	first.Enabled = false
+	if err := SaveSetupFile(path, []Enclosure{first, second}, original, pathIdentity); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Enclosures) != 2 || cfg.Enclosures[0].Enabled || !cfg.Enclosures[1].Enabled {
+		t.Fatalf("%+v", cfg)
+	}
+	saved, _ := os.ReadFile(path)
+	if !strings.Contains(string(saved), "# selected shelf") {
+		t.Fatal("lost comment")
+	}
+	if err := SaveSetupFile(path, []Enclosure{first, second}, original, pathIdentity); err == nil {
+		t.Fatal("stale preview clobbered config")
+	}
+	unchanged, _ := os.ReadFile(path)
+	if !bytes.Equal(saved, unchanged) {
+		t.Fatal("stale save changed file")
+	}
+	second.Enabled = false
+	if err := SaveSetupFile(path, []Enclosure{first, second}, saved, pathIdentity); err == nil {
+		t.Fatal("all-disabled config accepted")
+	}
+}
