@@ -81,7 +81,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, opts Opti
 		}
 		return 0
 	}
-	log := slog.New(slog.NewTextHandler(stderr, nil))
+	log := slog.New(newConsoleHandler(stderr))
 	fail := func(err error) int { log.Error("service failed", "error", err); return 1 }
 	if opts.Load == nil {
 		opts.Load = config.Load
